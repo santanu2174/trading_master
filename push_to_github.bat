@@ -3,7 +3,7 @@ title Push Delta Trade Pro to GitHub
 color 0B
 echo ========================================================
 echo   PUSH DELTA TRADE PRO TO GITHUB REPOSITORY
-echo   Repo: https://github.com/santanu2174/Ai_trading.git
+echo   Repo: https://github.com/santanu2174/trading_master.git
 echo ========================================================
 echo.
 
@@ -34,8 +34,8 @@ if "%GITHUB_TOKEN%"=="" (
     echo [INFO] No token entered. Attempting standard push...
     "%GIT_EXE%" push -u origin main
 ) else (
-    echo [INFO] Pushing with provided token to santanu2174/Ai_trading...
-    "%GIT_EXE%" remote set-url origin https://santanu2174:%GITHUB_TOKEN%@github.com/santanu2174/Ai_trading.git
+    echo [INFO] Pushing with provided token to santanu2174/trading_master...
+    "%GIT_EXE%" remote set-url origin https://santanu2174:%GITHUB_TOKEN%@github.com/santanu2174/trading_master.git
     "%GIT_EXE%" push -u origin main
 )
 
@@ -43,7 +43,7 @@ echo.
 if %ERRORLEVEL% EQU 0 (
     echo ========================================================
     echo   SUCCESS! Project has been saved to:
-    echo   https://github.com/santanu2174/Ai_trading
+    echo   https://github.com/santanu2174/trading_master
     echo ========================================================
 ) else (
     echo [ERROR] Push failed. Please check your token permissions (repo scope).
