@@ -1,0 +1,8 @@
+{
+  "telegramBotToken": "",
+  "telegramChatId": "",
+  "geminiApiKey": "",
+  "alertOnStrongOnly": true,
+  "audioAlerts": true,
+  "autoRefreshInterval": 15
+}

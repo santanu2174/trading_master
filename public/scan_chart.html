@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chart Scanner | Smart Money Concepts (SMC, FVG, BOS, CHoCH)</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+  <style>
+    .scanner-layout {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 18px;
+      padding: 18px 24px;
+      flex: 1;
+    }
+
+    @media (max-width: 1200px) {
+      .scanner-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dropzone-container {
+      background-color: var(--bg-card);
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .dropzone-container:hover, .dropzone-container.dragover {
+      border-color: var(--delta-purple);
+      background-color: rgba(99, 102, 241, 0.06);
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .paste-badge {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-gold);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
+    .chart-canvas-wrapper {
+      position: relative;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 520px;
+    }
+
+    canvas#annotatedCanvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .overlay-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .layer-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .layer-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .layer-label input {
+      cursor: pointer;
+      accent-color: var(--delta-purple);
+    }
+
+    .loading-spinner {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 40px;
+    }
+
+    .spinner-ring {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(99, 102, 241, 0.2);
+      border-top-color: var(--delta-purple);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="logo-badge" style="background: linear-gradient(135deg, #ec4899, #8b5cf6);">SMC SCANNER</div>
+      <div>
+        <div class="nav-title">Smart Money Concepts Chart Vision <span style="font-size: 13px; color: var(--accent-gold);">AI Engine</span></div>
+        <div class="nav-subtitle">Detects Support, Resistance, FVG, BOS & CHoCH on Any Screenshot</div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <a href="/" class="btn-secondary" style="text-decoration: none; font-weight: 600;">⚡ Back to Delta Live Feed</a>
+      <button id="apiKeySettingsBtn" class="btn-secondary">⚙️ Gemini API Key (Turbo)</button>
+      <button id="guideBtn" class="btn-secondary">📖 বাংলায় ট্রেডিং গাইড</button>
+    </div>
+  </header>
+
+  <!-- SUBHEADER / QUICK ACTIONS -->
+  <section class="stats-bar" style="justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 12px; font-size: 13px;">
+      <span style="color: var(--text-secondary);">📌 <b>How it works:</b> Upload or paste (<kbd style="background: #243049; padding: 2px 6px; border-radius: 4px;">Ctrl+V</kbd>) any TradingView, Delta, or Binance chart screenshot. The AI will draw institutional S/R, FVGs, BOS & CHoCH, and predict market direction (LONG or SHORT).</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="sampleBullBtn" class="btn-secondary" style="font-size: 11px;">🟢 Try Sample Bullish Chart</button>
+      <button id="sampleBearBtn" class="btn-secondary" style="font-size: 11px;">🔴 Try Sample Bearish Chart</button>
+    </div>
+  </section>
+
+  <!-- MAIN SCANNER LAYOUT -->
+  <main class="scanner-layout">
+
+    <!-- LEFT COLUMN: UPLOAD & ANNOTATED CANVAS -->
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+
+      <!-- DROPZONE (Visible when no image) -->
+      <div id="dropzone" class="dropzone-container">
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <div class="upload-icon">📷</div>
+        <div style="font-size: 16px; font-weight: 700;">Drag & Drop Chart Screenshot Here or Click to Browse</div>
+        <div class="paste-badge">💡 PRO TIP: Just press Ctrl + V to Paste screenshot directly from Clipboard!</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Supports PNG, JPG, JPEG, WEBP screenshots from Delta Exchange, TradingView, etc.</div>
+      </div>
+
+      <!-- LOADING INDICATOR -->
+      <div id="loadingIndicator" class="card loading-spinner">
+        <div class="spinner-ring"></div>
+        <div style="font-size: 15px; font-weight: 700; color: #fff;">Scanning Market Structure...</div>
+        <div style="font-size: 12px; color: var(--text-secondary);">Detecting Support/Resistance, Fair Value Gaps, BOS & CHoCH Levels</div>
+      </div>
+
+      <!-- ANNOTATED CHART VIEWER (Visible after scan) -->
+      <div id="chartViewerCard" class="card" style="display: none; padding: 12px; gap: 10px;">
+        
+        <!-- OVERLAY CONTROLS TOOLBAR -->
+        <div class="overlay-controls">
+          <div class="layer-toggles">
+            <label class="layer-label">
+              <input type="checkbox" id="toggleSR" checked>
+              <span style="color: #00c076;">■ Support & Resistance</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleFVG" checked>
+              <span style="color: #eab308;">■ FVG Imbalance</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleBOS" checked>
+              <span style="color: #38bdf8;">■ BOS (Structure)</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleCHOCH" checked>
+              <span style="color: #ec4899;">■ CHoCH (Reversal)</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleSetup" checked>
+              <span style="color: #a855f7;">■ Trade Setup Levels</span>
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button id="downloadAnnotatedBtn" class="btn-secondary" style="font-size: 11px;">💾 Download Marked Chart</button>
+            <button id="uploadNewBtn" class="btn-secondary" style="font-size: 11px;">🔄 Scan Another Chart</button>
+          </div>
+        </div>
+
+        <!-- CANVAS WRAPPER -->
+        <div class="chart-canvas-wrapper">
+          <canvas id="annotatedCanvas"></canvas>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+          <span>Institutional Smart Money Concepts (SMC) Overlay</span>
+          <span id="scanEngineSource">Engine: Intelligent Vision Heuristic</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: AI PREDICTION & TRADE SETUP -->
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+
+      <!-- DIRECTION PREDICTION BANNER -->
+      <div id="scanVerdictBanner" class="signal-banner neutral">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">
+          PREDICTED MARKET DIRECTION
+        </div>
+        <div id="scanDirectionBadge" class="signal-badge" style="font-size: 24px;">WAITING FOR CHART...</div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+          <span id="scanConfidenceBadge" class="signal-score-badge">Confidence: --</span>
+          <span id="scanTrendBadge" style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Structure: --</span>
+        </div>
+      </div>
+
+      <!-- ACTIONABLE TRADE SETUP CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Predicted Trade Setup</span>
+          <span style="font-size: 11px; color: var(--accent-gold);">Risk-Managed</span>
+        </div>
+
+        <div class="trade-box">
+          <div class="trade-row">
+            <span class="trade-row-label">Action</span>
+            <span id="setupAction" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Entry Zone</span>
+            <span id="setupEntry" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Stop Loss (SL)</span>
+            <span id="setupSL" class="trade-row-val" style="color: var(--bear-red);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 1 (TP1 - 50%)</span>
+            <span id="setupTP1" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 2 (TP2 - 30%)</span>
+            <span id="setupTP2" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 3 (TP3 - Runner)</span>
+            <span id="setupTP3" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Risk : Reward</span>
+            <span id="setupRRR" class="trade-row-val" style="color: var(--accent-gold);">--</span>
+          </div>
+
+          <ul class="rules-list" style="margin-top: 6px;">
+            <li id="setupExecutionRule">🛡️ <b>Golden Rule:</b> TP1 hit হলে ৫০% প্রফিট বুক করুন এবং Stop Loss সাথে সাথে Entry Price-এ সরিয়ে সম্পূর্ণ রিস্ক-ফ্রি ট্রেড উপভোগ করুন।</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SMC STRUCTURE ANALYSIS CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>⚡ SMC Structural Analysis</span>
+        </div>
+
+        <div id="smcObservationsList" class="confluence-list">
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 16px;">
+            Upload a chart to view detailed SMC breakdown
+          </div>
+        </div>
+      </div>
+
+      <!-- IN-DEPTH SUMMARY CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>📝 AI Rationale & Market Phase</span>
+        </div>
+        <p id="scanSummaryText" style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+          Upload any crypto or forex chart screenshot to perform automated institutional pattern recognition.
+        </p>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- GEMINI API KEY MODAL -->
+  <div id="apiKeyModal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 16px; font-weight: 700;">⚙️ Gemini API Key (Optional Turbo Vision)</h3>
+        <button id="closeApiKeyModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+        সিস্টেমে ইতিমধ্যে বিল্ট-ইন ইন্টেলিজেন্ট হিউরিস্টিক ভিশন ইঞ্জিন সক্রিয় রয়েছে। আপনি যদি অতিরিক্তভাবে Google-এর অফিসিয়াল <b>Gemini 1.5/2.0 Flash Multimodal AI</b> ভিশন পাওয়ার ব্যবহার করতে চান, তবে আপনার সম্পূর্ণ ফ্রী API Key এখানে সেভ করতে পারেন:
+      </p>
+
+      <div class="input-group">
+        <label>Google Gemini API Key (<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--delta-purple);">Get Free Key Here</a>)</label>
+        <input type="text" id="geminiApiKeyInput" placeholder="AIzaSy...">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+        <button id="clearApiKeyBtn" class="btn-secondary">Clear Key</button>
+        <button id="saveApiKeyBtn" class="btn-primary">💾 Save API Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BENGALI GUIDE MODAL -->
+  <div id="guideModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--accent-gold);">📘 Smart Money Concepts (SMC) চার্ট গাইড</h3>
+        <button id="closeGuideModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary); display: flex; flex-direction: column; gap: 14px;">
+        <p>
+          চার্ট স্ক্যানারটি প্রাতিষ্ঠানিক (Institutional) ট্রেডার ও মার্কেট মেকারদের পদচিহ্ন বিশ্লেষণ করে কাজ করে:
+        </p>
+
+        <div style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid var(--delta-purple);">
+          <b style="color: #fff;">🔍 চার্টে চিহ্নিত লেভেলসমূহ:</b>
+          <ul style="margin-left: 18px; margin-top: 6px;">
+            <li><b>Support / Demand Zone (সবুজ বক্স):</b> যেখানে শক্তিশালী বায়ারদের লিমিট অর্ডার জমা থাকে এবং প্রাইস বাউন্স করে।</li>
+            <li><b>Resistance / Supply Zone (লাল বক্স):</b> যেখানে বিক্রেতারা দাম আটকে দেয় এবং সেল প্রেসার তৈরি হয়।</li>
+            <li><b>FVG (Fair Value Gap - হলুদ বক্স):</b> ১ নম্বর ও ৩ নম্বর ক্যান্ডেলের মাঝে তৈরি হওয়া ইমব্যালান্স বা শূন্যস্থান। প্রাইস সাধারণত এই শূন্যস্থান পূর্ণ করতে রিটেস্ট করে।</li>
+            <li><b>BOS (Break of Structure - নীল লাইন):</b> ট্রেন্ডের দিকে পূর্বের সুইং হাই বা সুইং লো ভেঙে নতুন গতিপথ সৃষ্টি করা।</li>
+            <li><b>CHoCH (Change of Character - গোলাপি লাইন):</b> ট্রেন্ড রিভার্সাল বা গতি পরিবর্তনের প্রথম সংকেত। আপট্রেন্ড থেকে ডাউনট্রেন্ড বা বিপরীতমুখী হওয়ার প্রাথমিক লক্ষণ।</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="scan_chart.js"></script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delta Trade Pro | Futures Automation & Confluence Terminal</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="logo-badge">DELTA PRO</div>
+      <div>
+        <div class="nav-title">Futures AI Trade Analyzer <span style="font-size: 13px; color: var(--accent-gold);">v2.4</span></div>
+        <div class="nav-subtitle">Delta Exchange • Multi-Strategy Confluence Engine</div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <div class="status-badge">
+        <span class="pulse-dot"></span>
+        <span>DELTA LIVE FEED</span>
+      </div>
+      <a href="/scan_chart" class="btn-primary" style="text-decoration: none; background: linear-gradient(135deg, #ec4899, #8b5cf6); font-weight: 700;">📸 Scan Chart (SMC / FVG / BOS)</a>
+      <button id="guideBtn" class="btn-secondary">📖 বাংলায় ট্রেডিং গাইড</button>
+      <button id="audioToggleBtn" class="btn-secondary">🔊 Sound On</button>
+      <button id="tgSettingsBtn" class="btn-secondary">📱 Telegram Alerts</button>
+      <button id="refreshBtn" class="btn-primary">
+        🔄 Refresh (<span id="refreshCountdown">15s</span>)
+      </button>
+    </div>
+  </header>
+
+  <!-- MARKET & CONTROLS BAR -->
+  <section class="stats-bar">
+    <div class="selectors-group">
+      <!-- Symbol Toggle -->
+      <div class="btn-toggle-group">
+        <button class="btn-toggle symbol-btn active" data-symbol="BTCUSD">BTC / USD</button>
+        <button class="btn-toggle symbol-btn" data-symbol="ETHUSD">ETH / USD</button>
+        <button class="btn-toggle symbol-btn" data-symbol="SOLUSD">SOL / USD</button>
+      </div>
+
+      <!-- Timeframe Toggle -->
+      <div class="btn-toggle-group">
+        <button class="btn-toggle tf-btn" data-tf="5m">5M (Scalp)</button>
+        <button class="btn-toggle tf-btn active" data-tf="15m">15M (Intraday ⭐)</button>
+        <button class="btn-toggle tf-btn" data-tf="1h">1H (Trend)</button>
+      </div>
+    </div>
+
+    <!-- Live Market Stats -->
+    <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+      <div class="market-stat">
+        <span class="stat-label">Last Price</span>
+        <span id="currentPriceDisplay" class="stat-value">--</span>
+      </div>
+      <div class="market-stat">
+        <span class="stat-label">24h Change</span>
+        <span id="change24hDisplay" class="stat-value green">--</span>
+      </div>
+      <div class="market-stat">
+        <span class="stat-label">Delta Mark Price</span>
+        <span id="markPriceDisplay" class="stat-value">--</span>
+      </div>
+      <div class="market-stat">
+        <span class="stat-label">24h High</span>
+        <span id="high24hDisplay" class="stat-value">--</span>
+      </div>
+      <div class="market-stat">
+        <span class="stat-label">24h Low</span>
+        <span id="low24hDisplay" class="stat-value">--</span>
+      </div>
+      <div class="market-stat">
+        <span class="stat-label">24h Vol</span>
+        <span id="vol24hDisplay" class="stat-value">--</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN TERMINAL LAYOUT -->
+  <main class="main-container">
+
+    <!-- LEFT COLUMN: SIGNALS & TRADE SETUP -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- SIGNAL BANNER -->
+      <div id="signalBanner" class="signal-banner neutral">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">
+          PREDICTED INTRADAY DIRECTION
+        </div>
+        <div id="signalBadge" class="signal-badge">ANALYZING...</div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+          <span id="signalScoreBadge" class="signal-score-badge">Confluence: 0 / 100</span>
+          <span id="probabilityDisplay" style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Accuracy: ~50%</span>
+        </div>
+
+        <!-- CONFLUENCE SCORE GAUGE -->
+        <div class="meter-container" style="width: 100%; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">
+            <span>BEARISH (SHORT)</span>
+            <span>NEUTRAL</span>
+            <span>BULLISH (LONG)</span>
+          </div>
+          <div class="meter-track">
+            <div id="meterBearFill" class="meter-fill-bear" style="width: 0%;"></div>
+            <div class="meter-center-line"></div>
+            <div id="meterBullFill" class="meter-fill-bull" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIONABLE TRADE SETUP BOX -->
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Actionable Trade Setup</span>
+          <span style="font-size: 11px; color: var(--accent-gold);">Risk-Managed</span>
+        </div>
+
+        <div id="tradeSetupBox" class="trade-box">
+          <div class="trade-row">
+            <span class="trade-row-label">Action</span>
+            <span id="tradeDirection" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Entry Price</span>
+            <span id="tradeEntry" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Stop Loss (SL)</span>
+            <span id="tradeSL" class="trade-row-val" style="color: var(--bear-red);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 1 (TP1 - 50%)</span>
+            <span id="tradeTP1" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 2 (TP2 - 30%)</span>
+            <span id="tradeTP2" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Target 3 (TP3 - Runner)</span>
+            <span id="tradeTP3" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Risk : Reward</span>
+            <span id="tradeRR" class="trade-row-val" style="color: var(--accent-gold);">--</span>
+          </div>
+
+          <div style="font-size: 11px; color: var(--bear-red); margin-top: 4px;" id="invalidationText">
+            Invalidation: --
+          </div>
+
+          <!-- Execution Rules -->
+          <ul class="rules-list">
+            <li>🛡️ <b>Golden Rule:</b> TP1 hit হলে ৫০% প্রফিট বুক করুন এবং Stop Loss সাথে সাথে Entry Price (Cost-to-Cost)-এ সরিয়ে নিন।</li>
+            <li>⚡ ট্রেন্ড কনফার্মেশন ছাড়া কখনো সাইডওয়েজ মার্কেটে জোর করে ট্রেড নিবেন না।</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- RISK & POSITION SIZE CALCULATOR -->
+      <div class="card">
+        <div class="card-title">
+          <span>🧮 Margin & Position Calculator</span>
+        </div>
+
+        <div class="calc-grid">
+          <div class="input-group">
+            <label>Capital ($)</label>
+            <input type="number" id="calcBalance" value="500" min="10" step="50">
+          </div>
+          <div class="input-group">
+            <label>Risk Per Trade (%)</label>
+            <input type="number" id="calcRisk" value="2" min="0.5" max="5" step="0.5">
+          </div>
+          <div class="input-group" style="grid-column: 1 / -1;">
+            <label>Futures Leverage</label>
+            <select id="calcLeverage">
+              <option value="5">5x (Low Risk)</option>
+              <option value="10" selected>10x (Standard)</option>
+              <option value="15">15x (Moderate)</option>
+              <option value="25">25x (Aggressive Scalp)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="calc-result-box">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Max Dollar Risk:</span>
+            <b id="calcDollarRisk" style="color: var(--bear-red);">$10.00</b>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Suggested Position:</span>
+            <b id="calcPosSize" style="color: var(--delta-purple);">0.000 BTC</b>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Estimated Gains:</span>
+            <b id="calcTargetProfit" style="color: var(--bull-green);">TP1: +$15 | TP2: +$25</b>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER COLUMN: INTERACTIVE CHART -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div class="card" style="padding: 12px; height: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div class="card-title" style="margin: 0;">
+            <span>📊 Live Technical Chart with EMA 9/21, S/R Zones & Signals</span>
+          </div>
+          <div style="display: flex; gap: 10px; font-size: 11px; font-family: var(--font-mono);">
+            <span style="color: #38bdf8;">■ EMA 9</span>
+            <span style="color: #fbbf24;">■ EMA 21</span>
+            <span style="color: var(--bull-green);">■ Support</span>
+            <span style="color: var(--bear-red);">■ Resistance</span>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div id="chartOverlayText" class="chart-header-overlay">
+            <span>Hover over candle to inspect details</span>
+          </div>
+          <canvas id="chartCanvas"></canvas>
+        </div>
+
+        <!-- Strategy Summary Callout -->
+        <div style="margin-top: 10px; font-size: 12px; color: var(--text-secondary); background: #0b111b; padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--delta-purple);">
+          💡 <b>Strategy Confluence Breakdown:</b> This engine analyzes 1H higher timeframe trend, 15M/5M EMA alignment, Wilder's RSI regular & hidden divergences, MACD momentum expansion, SuperTrend trajectory, and Delta Exchange orderflow bid/ask imbalance.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: ORDERBOOK DEPTH & STRATEGY CHECKLIST -->
+    <div class="orderflow-column" style="display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- VALID SUPPORT & RESISTANCE ZONES CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>🛡️ Valid Support & Resistance Zones</span>
+          <span id="priceZoneStatusBadge" style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; background: rgba(99, 102, 241, 0.2); color: var(--delta-purple); font-family: var(--font-mono);">ZONES LOADED</span>
+        </div>
+
+        <div id="validZonesContainer" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 12px;">
+            Detecting valid institutional zones...
+          </div>
+        </div>
+      </div>
+
+      <!-- DELTA ORDERBOOK DEPTH GAUGE -->
+      <div class="card">
+        <div class="card-title">
+          <span>🌊 Delta Orderflow Depth</span>
+          <span style="font-size: 11px; color: var(--delta-purple);">L2 Book</span>
+        </div>
+
+        <div class="depth-meter-bar">
+          <div id="depthBidPart" class="depth-bid-part" style="width: 50%;">50% Bids</div>
+          <div id="depthAskPart" class="depth-ask-part" style="width: 50%;">50% Asks</div>
+        </div>
+
+        <table class="book-table">
+          <thead>
+            <tr>
+              <th>Bid Price</th>
+              <th>Size</th>
+              <th style="text-align: right;">Ask Price</th>
+              <th style="text-align: right;">Size</th>
+            </tr>
+          </thead>
+          <tbody id="orderbookRows">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- STRATEGY CONFLUENCE CHECKLIST -->
+      <div class="card">
+        <div class="card-title">
+          <span>⚡ Multi-Strategy Matrix</span>
+        </div>
+
+        <div id="confluenceFactors" class="confluence-list">
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 20px;">
+            Evaluating indicators...
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- RECENT TRADE SIGNALS HISTORY -->
+  <section class="history-section">
+    <div class="card-title" style="margin-bottom: 12px;">
+      <span>📋 Live Signal History & Audit Log</span>
+      <span style="font-size: 11px; color: var(--text-muted);">Delta Exchange Intraday Signals</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Symbol</th>
+            <th>Timeframe</th>
+            <th>Signal</th>
+            <th>Trigger Price</th>
+            <th>Entry Price</th>
+            <th>Stop Loss</th>
+            <th>TP 1</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody">
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">
+              Waiting for high-confluence trade triggers...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TELEGRAM ALERT MODAL -->
+  <div id="tgModal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 16px; font-weight: 700;">📱 Telegram Bot Notifications</h3>
+        <button id="closeTgModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+        যখনই Delta Exchange এ BTC বা ETH এ Strong Buy বা Strong Sell সিগন্যাল আসবে, আপনার ফোনে ইনস্ট্যান্ট Telegram নোটিফিকেশন পাঠাতে বট কনফিগার করুন:
+      </p>
+
+      <div class="input-group">
+        <label>Telegram Bot Token (From @BotFather)</label>
+        <input type="text" id="tgBotToken" placeholder="e.g. 7123456789:ABCdefGhIjkLmNoPqRsTuVwXyZ">
+      </div>
+
+      <div class="input-group">
+        <label>Telegram Chat ID (From @userinfobot)</label>
+        <input type="text" id="tgChatId" placeholder="e.g. 123456789">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+        <button id="testTgBtn" class="btn-secondary">✉️ Send Test Alert</button>
+        <button id="saveTgBtn" class="btn-primary">💾 Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BENGALI TRADER GUIDE MODAL -->
+  <div id="guideModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--accent-gold);">📘 Delta Pro ট্রেডিং গাইড (বাংলা)</h3>
+        <button id="closeGuideModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary); display: flex; flex-direction: column; gap: 14px;">
+        <p>
+          স্বাগতম! আপনি একজন প্রফেশনাল ট্রেডারের মতো Delta Exchange-এ <b>BTC & ETH Futures</b> ট্রেড করার জন্য এই অটোমেশন সিস্টেমটি তৈরি করা হয়েছে।
+        </p>
+
+        <div style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid var(--delta-purple);">
+          <b style="color: #fff;">🎯 সিস্টেমের ৫টি মূল স্তম্ভ (Multi-Strategy Confluence):</b>
+          <ol style="margin-left: 18px; margin-top: 6px;">
+            <li><b>1H Macro Trend Filter:</b> ১ ঘণ্টার ট্রেন্ড যদি বিয়ারিশ হয়, তাহলে ছোট টাইমফ্রেমে বাই সিগন্যাল ফিল্টার করা হয়। ট্রেন্ডের বিপরীতে কোনো ট্রেড নয়!</li>
+            <li><b>Intraday EMA Stack:</b> ৯, ২১ এবং ৫০ EMA-র সঠিক মোমেন্টাম অর্ডার ও গোল্ডেন/ডেথ ক্রস কনফার্ম করে।</li>
+            <li><b>RSI Regular & Hidden Divergence:</b> প্রাইস লোয়ার লো বানালে কিন্তু RSI হায়ার লো বানালে পাওয়ারফুল রিভার্সাল লং সিগন্যাল শনাক্ত করে।</li>
+            <li><b>Delta Orderbook Flow:</b> Delta Exchange-এর লাইভ বায়ার ও সেলার ডেপথ প্রেসার ট্র্যাক করে।</li>
+            <li><b>Smart Money Concepts (SMC):</b> অর্ডার ব্লক (OB) ও ফেয়ার ভ্যালু গ্যাপ (FVG) সাপোর্ট-রেজিস্ট্যান্স সাপোর্ট হিসেবে কাজ করে।</li>
+          </ol>
+        </div>
+
+        <div style="background: rgba(0, 192, 118, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid var(--bull-green);">
+          <b style="color: var(--bull-green);">🛡️ মানি ম্যানেজমেন্ট ও প্রফিট বুকিং নিয়ম:</b>
+          <ul style="margin-left: 18px; margin-top: 6px;">
+            <li><b>ক্যাপিটাল রিস্ক:</b> প্রতি ট্রেডে ক্যাপিটালের ১% থেকে সর্বোচ্চ ২% রিস্ক রাখবেন।</li>
+            <li><b>TP1 হিট হলে:</b> আপনার পজিশনের ৫০% প্রফিট সরাসরি ক্লোজ করুন এবং Stop Loss-কে সাথে সাথে Entry Price (Cost-to-Cost)-এ নিয়ে আসুন। এতে ট্রেডটি সম্পূর্ণ <b>জিরো-রিস্ক</b> হয়ে যায়!</li>
+            <li><b>TP2 & TP3:</b> বাকি ৩০% ও ২০% রানার পজিশন ট্রেইল করুন বড় প্রফিটের জন্য।</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
