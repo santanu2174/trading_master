@@ -1,11 +1,13 @@
-// confluenceEngine.js - Multi-Strategy Confluence & Trade Generation Engine
+// confluenceEngine.js - Multi-Strategy Confluence & Strict Confirmation Engine
 
 const deltaApi = require('./deltaApi');
 const indicators = require('./indicators');
+const { analyzeSessions } = require('./sessionEngine');
 
 /**
- * Analyzes market data across multiple strategies and generates an actionable trade setup.
- * @param {string} symbol - 'BTCUSDT' or 'ETHUSDT'
+ * Analyzes market data across multiple strategies, indicators, and sessions.
+ * Implements a strict confirmation gate: Will NOT issue trade entry until ALL required strategies confirm.
+ * @param {string} symbol - 'BTCUSD' or 'ETHUSD'
  * @param {string} executionTf - '5m' or '15m'
  */
 async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
@@ -26,11 +28,11 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
   const volumes = ltfCandles.map(c => c.volume);
   const lastIdx = ltfCandles.length - 1;
 
-  // 2. Compute Intraday Indicators
+  // 2. Compute Intraday Technical Indicators
   const ema9 = indicators.calculateEMA(closes, 9);
   const ema21 = indicators.calculateEMA(closes, 21);
   const ema50 = indicators.calculateEMA(closes, 50);
-  const ema200 = indicators.calculateEMA(closes, 200);
+  const ema200 = indicators.calculateEMA(closes, Math.min(200, closes.length));
 
   const rsi = indicators.calculateRSI(closes, 14);
   const macd = indicators.calculateMACD(closes, 12, 26, 9);
@@ -43,6 +45,9 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
   const divergence = indicators.detectDivergences(ltfCandles, rsi, 35);
   const smc = indicators.detectSmartMoneyStructures(ltfCandles, currentPrice);
   const validZones = smc.validZones;
+
+  // 3. Compute Institutional Trading Sessions & Killzones
+  const sessionData = analyzeSessions(ltfCandles, currentPrice);
 
   // Current values
   const currEma9 = ema9[lastIdx];
@@ -57,13 +62,12 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
   const currVol = volumes[lastIdx];
   const avgVol = volumeMa20[lastIdx] || currVol;
 
-  // 3. Compute Higher Timeframe (1h) Trend Filter
+  // 4. Compute Higher Timeframe (1h) Trend Filter
   let htfBias = 'NEUTRAL';
   let htfScore = 0;
   if (htfCandles && htfCandles.length >= 30) {
     const htfCloses = htfCandles.map(c => c.close);
     const htfEma50 = indicators.calculateEMA(htfCloses, 50);
-    const htfEma200 = indicators.calculateEMA(htfCloses, Math.min(100, htfCloses.length));
     const htfSuper = indicators.calculateSupertrend(htfCandles, 10, 3);
 
     const lastHtfIdx = htfCandles.length - 1;
@@ -83,37 +87,38 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
     }
   }
 
-  // 4. Confluence Scoring Engine
-  let rawScore = 0; // -100 to +100
+  // 5. Build 8-Pillar Multi-Strategy Confirmation Matrix
+  let rawScore = 0;
   const factors = [];
 
-  // Factor A: HTF Trend Alignment (Max +/- 20)
+  // Pillar 1: 1H Macro Trend Filter (Max +/- 20)
   rawScore += htfScore;
   factors.push({
-    name: '1H Macro Trend Filter',
+    id: 'htf',
+    name: '1. 1H Macro Trend Filter',
     status: htfBias === 'BULLISH' ? 'BULLISH' : htfBias === 'BEARISH' ? 'BEARISH' : 'NEUTRAL',
     points: htfScore,
-    detail: `1H Trend is ${htfBias} (Higher timeframe macro direction)`
+    detail: `1H Trend is ${htfBias} (Higher timeframe institutional direction)`
   });
 
-  // Factor B: Intraday EMA Alignment (Max +/- 20)
+  // Pillar 2: Intraday EMA Alignment (Max +/- 15)
   let emaScore = 0;
   let emaDetail = '';
   if (currEma9 && currEma21) {
     if (currentPrice > currEma9 && currEma9 > currEma21) {
       if (currEma50 && currEma21 > currEma50) {
-        emaScore = 20;
+        emaScore = 15;
         emaDetail = 'Perfect Bullish EMA Stack (Price > 9 > 21 > 50)';
       } else {
-        emaScore = 12;
+        emaScore = 10;
         emaDetail = 'Bullish Short-term Alignment (Price > 9 EMA > 21 EMA)';
       }
     } else if (currentPrice < currEma9 && currEma9 < currEma21) {
       if (currEma50 && currEma21 < currEma50) {
-        emaScore = -20;
+        emaScore = -15;
         emaDetail = 'Perfect Bearish EMA Stack (Price < 9 < 21 < 50)';
       } else {
-        emaScore = -12;
+        emaScore = -10;
         emaDetail = 'Bearish Short-term Alignment (Price < 9 EMA < 21 EMA)';
       }
     } else {
@@ -123,34 +128,37 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
   }
   rawScore += emaScore;
   factors.push({
-    name: 'Intraday EMA Alignment',
+    id: 'ema',
+    name: '2. Intraday EMA Alignment',
     status: emaScore > 0 ? 'BULLISH' : emaScore < 0 ? 'BEARISH' : 'NEUTRAL',
     points: emaScore,
     detail: emaDetail
   });
 
-  // Factor C: SuperTrend & Price Action (Max +/- 15)
+  // Pillar 3: SuperTrend (10, 3) (Max +/- 15)
   let stScore = 0;
   if (currSupertrend === 1) {
     stScore = 15;
     factors.push({
-      name: 'SuperTrend (10, 3)',
+      id: 'supertrend',
+      name: '3. SuperTrend (10, 3)',
       status: 'BULLISH',
       points: 15,
-      detail: `SuperTrend is GREEN (Support at $${supertrend.supertrend[lastIdx].toFixed(1)})`
+      detail: `SuperTrend is GREEN (Support holding at $${supertrend.supertrend[lastIdx].toFixed(1)})`
     });
   } else {
     stScore = -15;
     factors.push({
-      name: 'SuperTrend (10, 3)',
+      id: 'supertrend',
+      name: '3. SuperTrend (10, 3)',
       status: 'BEARISH',
       points: -15,
-      detail: `SuperTrend is RED (Resistance at $${supertrend.supertrend[lastIdx].toFixed(1)})`
+      detail: `SuperTrend is RED (Resistance capping at $${supertrend.supertrend[lastIdx].toFixed(1)})`
     });
   }
   rawScore += stScore;
 
-  // Factor D: RSI & Divergence (Max +/- 25)
+  // Pillar 4: RSI & Divergence Analysis (Max +/- 20)
   let rsiScore = 0;
   let rsiDetail = `RSI(14) at ${currRsi ? currRsi.toFixed(1) : 'N/A'}`;
   let rsiStatus = 'NEUTRAL';
@@ -164,34 +172,34 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
     rsiDetail += ` | ${divergence.description}`;
     rsiStatus = 'BEARISH';
   } else {
-    // Normal momentum zones
-    if (currRsi > 52 && currRsi < 68) {
+    if (currRsi > 53 && currRsi < 68) {
       rsiScore += 10;
       rsiStatus = 'BULLISH';
-      rsiDetail += ' (Healthy Bullish Momentum Zone)';
-    } else if (currRsi < 48 && currRsi > 32) {
+      rsiDetail += ' (Bullish Momentum Expansion)';
+    } else if (currRsi < 47 && currRsi > 32) {
       rsiScore -= 10;
       rsiStatus = 'BEARISH';
       rsiDetail += ' (Bearish Momentum Expansion)';
     } else if (currRsi <= 30) {
-      rsiScore += 8;
+      rsiScore += 6;
       rsiStatus = 'BULLISH';
-      rsiDetail += ' (Oversold - Potential Bounce Zone)';
+      rsiDetail += ' (Oversold - Potential Rebound Zone)';
     } else if (currRsi >= 70) {
-      rsiScore -= 8;
+      rsiScore -= 6;
       rsiStatus = 'BEARISH';
       rsiDetail += ' (Overbought - Potential Exhaustion)';
     }
   }
   rawScore += rsiScore;
   factors.push({
-    name: 'RSI & Divergence Analysis',
+    id: 'rsi',
+    name: '4. RSI & Divergence Engine',
     status: rsiStatus,
     points: rsiScore,
     detail: rsiDetail
   });
 
-  // Factor E: MACD Histogram Momentum (Max +/- 10)
+  // Pillar 5: MACD Histogram Momentum (Max +/- 10)
   let macdScore = 0;
   let macdStatus = 'NEUTRAL';
   let macdDetail = '';
@@ -201,116 +209,202 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       macdStatus = 'BULLISH';
       macdDetail = 'MACD Histogram positive and expanding upward (Buyers accelerating)';
     } else if (currMacdHist > 0 && currMacdHist <= prevMacdHist) {
-      macdScore = 4;
+      macdScore = 3;
       macdStatus = 'BULLISH';
-      macdDetail = 'MACD Histogram positive but weakening (Caution: momentum decelerating)';
+      macdDetail = 'MACD Histogram positive but decelerating (Caution: momentum weakening)';
     } else if (currMacdHist < 0 && currMacdHist < prevMacdHist) {
       macdScore = -10;
       macdStatus = 'BEARISH';
-      macdDetail = 'MACD Histogram negative and expanding downward (Sellers dominating)';
+      macdDetail = 'MACD Histogram negative and expanding downward (Sellers dominant)';
     } else if (currMacdHist < 0 && currMacdHist >= prevMacdHist) {
-      macdScore = -4;
+      macdScore = -3;
       macdStatus = 'BEARISH';
       macdDetail = 'MACD Histogram negative but contracting (Selling pressure subsiding)';
     }
   }
   rawScore += macdScore;
   factors.push({
-    name: 'MACD Momentum Oscillator',
+    id: 'macd',
+    name: '5. MACD Momentum Oscillator',
     status: macdStatus,
     points: macdScore,
     detail: macdDetail
   });
 
-  // Factor F: Volume Spike Confirmation (Max +/- 10)
-  let volScore = 0;
-  let volStatus = 'NEUTRAL';
-  let volDetail = `Volume: ${(currVol || 0).toFixed(2)} vs Avg: ${(avgVol || 0).toFixed(2)}`;
-  if (currVol > avgVol * 1.35) {
-    const isGreenCandle = ltfCandles[lastIdx].close >= ltfCandles[lastIdx].open;
-    if (isGreenCandle) {
-      volScore = 10;
-      volStatus = 'BULLISH';
-      volDetail += ' (Strong Bullish Volume Spike detected)';
-    } else {
-      volScore = -10;
-      volStatus = 'BEARISH';
-      volDetail += ' (Strong Bearish Volume Flush detected)';
-    }
-  } else {
-    volDetail += ' (Average trading volume)';
-  }
-  rawScore += volScore;
+  // Pillar 6: Trading Sessions & Liquidity Sweep (Max +/- 15)
+  let sessionScore = sessionData.asiaRange.score || 0;
+  let sessionStatus = 'NEUTRAL';
+  if (sessionScore > 0) sessionStatus = 'BULLISH';
+  else if (sessionScore < 0) sessionStatus = 'BEARISH';
+
+  rawScore += sessionScore;
   factors.push({
-    name: 'Volume Flow & Confirmation',
-    status: volStatus,
-    points: volScore,
-    detail: volDetail
+    id: 'session',
+    name: '6. Trading Session & Liquidity Sweep',
+    status: sessionStatus,
+    points: sessionScore,
+    detail: `${sessionData.currentSessionName} | ${sessionData.asiaRange.detail}`
   });
 
-  // Factor G: Delta Exchange Orderbook Depth Pressure (Max +/- 10)
-  let obScore = 0;
-  let obStatus = 'NEUTRAL';
-  let obDetail = 'Orderbook depth balanced';
-  if (orderbook) {
-    if (orderbook.bidRatio >= 60) {
-      obScore = 10;
-      obStatus = 'BULLISH';
-      obDetail = `Strong Buyer Wall: ${orderbook.bidRatio}% Bids vs ${orderbook.askRatio}% Asks`;
-    } else if (orderbook.askRatio >= 60) {
-      obScore = -10;
-      obStatus = 'BEARISH';
-      obDetail = `Heavy Seller Resistance: ${orderbook.askRatio}% Asks vs ${orderbook.bidRatio}% Bids`;
-    } else {
-      obDetail = `Balanced Orderbook: ${orderbook.bidRatio}% Bids / ${orderbook.askRatio}% Asks`;
-    }
+  // Pillar 7: Valid Support & Resistance Reaction (Max +/- 15)
+  let zoneScore = 0;
+  let zoneStatus = 'NEUTRAL';
+  let zoneDetail = validZones.priceStatus ? validZones.priceStatus.replace(/_/g, ' ') : 'Consolidating between zones';
+
+  if (validZones.priceStatus?.includes('SUPPORT')) {
+    zoneScore = 15;
+    zoneStatus = 'BULLISH';
+    zoneDetail = `Price is testing Valid Demand Support ($${validZones.nearestSupport?.bottom} - $${validZones.nearestSupport?.top})`;
+  } else if (validZones.priceStatus?.includes('RESISTANCE')) {
+    zoneScore = -15;
+    zoneStatus = 'BEARISH';
+    zoneDetail = `Price is testing Valid Supply Resistance ($${validZones.nearestResistance?.bottom} - $${validZones.nearestResistance?.top})`;
   }
-  rawScore += obScore;
+  rawScore += zoneScore;
   factors.push({
-    name: 'Delta Orderflow Depth',
-    status: obStatus,
-    points: obScore,
-    detail: obDetail
+    id: 'zones',
+    name: '7. Institutional Support / Resistance Zone',
+    status: zoneStatus,
+    points: zoneScore,
+    detail: zoneDetail
+  });
+
+  // Pillar 8: Volume Surge & Delta Orderflow (Max +/- 10)
+  let flowScore = 0;
+  let flowStatus = 'NEUTRAL';
+  let flowDetail = '';
+  const isVolSpike = currVol > avgVol * 1.35;
+  const isBuyerWall = orderbook && orderbook.bidRatio >= 58;
+  const isSellerWall = orderbook && orderbook.askRatio >= 58;
+
+  if (isVolSpike && isBuyerWall) {
+    flowScore = 10;
+    flowStatus = 'BULLISH';
+    flowDetail = `Volume surge + Buyer Wall (${orderbook.bidRatio}% Bids)`;
+  } else if (isVolSpike && isSellerWall) {
+    flowScore = -10;
+    flowStatus = 'BEARISH';
+    flowDetail = `Volume flush + Heavy Seller Resistance (${orderbook.askRatio}% Asks)`;
+  } else if (isBuyerWall) {
+    flowScore = 6;
+    flowStatus = 'BULLISH';
+    flowDetail = `Buyer wall dominant (${orderbook.bidRatio}% Bids)`;
+  } else if (isSellerWall) {
+    flowScore = -6;
+    flowStatus = 'BEARISH';
+    flowDetail = `Seller wall dominant (${orderbook.askRatio}% Asks)`;
+  } else {
+    flowDetail = `Orderflow balanced: ${orderbook?.bidRatio || 50}% Bids / ${orderbook?.askRatio || 50}% Asks`;
+  }
+  rawScore += flowScore;
+  factors.push({
+    id: 'flow',
+    name: '8. Volume & Orderflow Depth',
+    status: flowStatus,
+    points: flowScore,
+    detail: flowDetail
   });
 
   // Normalize final confluence score (-100 to +100)
   const finalScore = Math.max(-100, Math.min(100, rawScore));
   const absScore = Math.abs(finalScore);
 
-  // 5. Determine Trade Signal Category
-  let signal = 'NEUTRAL / WAIT';
-  let signalClass = 'neutral';
-  let biasDirection = 'NEUTRAL';
+  // 6. STRICT CONFIRMATION GATEKEEPER
+  // Count how many factors are bullish vs bearish
+  const bullishFactorsCount = factors.filter(f => f.status === 'BULLISH').length;
+  const bearishFactorsCount = factors.filter(f => f.status === 'BEARISH').length;
+  const totalFactorsCount = factors.length; // 8 factors
 
-  if (finalScore >= 60) {
-    signal = 'STRONG BUY (LONG)';
-    signalClass = 'strong-buy';
-    biasDirection = 'LONG';
-  } else if (finalScore >= 35) {
-    signal = 'SCALP BUY (LONG)';
-    signalClass = 'buy';
-    biasDirection = 'LONG';
-  } else if (finalScore <= -60) {
-    signal = 'STRONG SELL (SHORT)';
-    signalClass = 'strong-sell';
-    biasDirection = 'SHORT';
-  } else if (finalScore <= -35) {
-    signal = 'SCALP SELL (SHORT)';
-    signalClass = 'sell';
-    biasDirection = 'SHORT';
-  } else {
-    signal = 'NEUTRAL (WAIT FOR BREAKOUT)';
-    signalClass = 'neutral';
-    biasDirection = 'NEUTRAL';
+  const missingConfirmations = [];
+  let isFullConfirmation = false;
+  let confirmedDirection = 'NEUTRAL';
+
+  // Rule 1: High threshold (at least score >= 70 OR score <= -70)
+  // Rule 2: At least 6 out of 8 factors must agree
+  // Rule 3: 1H Macro Trend must NOT contradict
+  // Rule 4: RSI Divergence must NOT contradict
+
+  if (finalScore >= 65 && bullishFactorsCount >= 5) {
+    // Check Long Confirmation Rules
+    let passed = true;
+
+    if (htfBias === 'BEARISH') {
+      passed = false;
+      missingConfirmations.push('❌ 1H Macro Trend is BEARISH — Counter-trend Long is strictly prohibited.');
+    }
+    if (divergence.type.includes('BEARISH')) {
+      passed = false;
+      missingConfirmations.push('❌ Bearish RSI Divergence detected — Risk of impending pullback.');
+    }
+    if (validZones.priceStatus?.includes('RESISTANCE')) {
+      passed = false;
+      missingConfirmations.push('❌ Price is directly under a Valid Resistance Supply Zone — Do not buy into a ceiling.');
+    }
+
+    if (passed && finalScore >= 65) {
+      isFullConfirmation = true;
+      confirmedDirection = 'LONG';
+    }
+  } else if (finalScore <= -65 && bearishFactorsCount >= 5) {
+    // Check Short Confirmation Rules
+    let passed = true;
+
+    if (htfBias === 'BULLISH') {
+      passed = false;
+      missingConfirmations.push('❌ 1H Macro Trend is BULLISH — Counter-trend Short is strictly prohibited.');
+    }
+    if (divergence.type.includes('BULLISH')) {
+      passed = false;
+      missingConfirmations.push('❌ Bullish RSI Divergence detected — Risk of sudden bounce.');
+    }
+    if (validZones.priceStatus?.includes('SUPPORT')) {
+      passed = false;
+      missingConfirmations.push('❌ Price is directly on top of a Valid Support Demand Zone — Do not short into a floor.');
+    }
+
+    if (passed && finalScore <= -65) {
+      isFullConfirmation = true;
+      confirmedDirection = 'SHORT';
+    }
   }
 
-  // 6. Professional Risk-Managed Trade Setup Construction
+  // Populate generic missing confirmations if not yet met
+  if (!isFullConfirmation) {
+    if (finalScore > 0 && finalScore < 65) {
+      missingConfirmations.push(`⏳ Bullish Confluence Score (${finalScore}%) is below strict minimum threshold (65%).`);
+    } else if (finalScore < 0 && finalScore > -65) {
+      missingConfirmations.push(`⏳ Bearish Confluence Score (${Math.abs(finalScore)}%) is below strict minimum threshold (65%).`);
+    } else if (finalScore === 0) {
+      missingConfirmations.push('⏳ Market is in Choppy Consolidation — Indicators are conflicting.');
+    }
+
+    if (bullishFactorsCount < 5 && bearishFactorsCount < 5) {
+      missingConfirmations.push(`⏳ Only ${Math.max(bullishFactorsCount, bearishFactorsCount)}/8 strategies confirmed (Minimum 5 required).`);
+    }
+  }
+
+  // 7. Determine Signal & Build Trade Setup
+  let signal = 'NEUTRAL / WAIT FOR CONFIRMATION';
+  let signalClass = 'neutral';
+
+  if (isFullConfirmation && confirmedDirection === 'LONG') {
+    signal = '🚀 FULL CONFIRMATION: STRONG LONG (BUY)';
+    signalClass = 'strong-buy';
+  } else if (isFullConfirmation && confirmedDirection === 'SHORT') {
+    signal = '🚀 FULL CONFIRMATION: STRONG SHORT (SELL)';
+    signalClass = 'strong-sell';
+  } else {
+    signal = '⏳ WAITING FOR COMPLETE CONFIRMATION (NO TRADE)';
+    signalClass = 'neutral';
+    confirmedDirection = 'NEUTRAL';
+  }
+
   let tradeSetup = null;
   const bufferAtr = currAtr * 1.5;
 
-  if (biasDirection === 'LONG') {
+  // STRICT RULE: If not fully confirmed, DO NOT GIVE ENTRY/SL/TP!
+  if (isFullConfirmation && confirmedDirection === 'LONG') {
     const entryPrice = currentPrice;
-    // SL below nearest valid support demand zone bottom with ATR buffer
     const supBottom = validZones?.nearestSupport ? validZones.nearestSupport.bottom : (smc.keySupports[0] || currentPrice - bufferAtr);
     const stopLoss = Math.min(supBottom - (currAtr * 0.3), currentPrice - bufferAtr);
     const risk = entryPrice - stopLoss;
@@ -321,7 +415,8 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       const tp3 = entryPrice + (risk * 4.0);
 
       tradeSetup = {
-        direction: 'BUY / LONG',
+        isConfirmed: true,
+        direction: 'BUY / LONG (CONFIRMED ✅)',
         entryPrice: parseFloat(entryPrice.toFixed(2)),
         stopLoss: parseFloat(stopLoss.toFixed(2)),
         tp1: parseFloat(tp1.toFixed(2)),
@@ -330,7 +425,7 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
         riskDistance: parseFloat(risk.toFixed(2)),
         riskPercentage: parseFloat(((risk / entryPrice) * 100).toFixed(2)),
         riskRewardRatio: '1 : 2.5 (Avg)',
-        invalidation: `Candle closes below $${stopLoss.toFixed(2)} invalidates this Long setup.`,
+        invalidation: `Candle close below $${stopLoss.toFixed(2)} invalidates this setup.`,
         executionRules: [
           'Entry: Enter market or limit order near entry price.',
           'Take Profit 1: Close 50% position when TP1 is hit.',
@@ -340,7 +435,7 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
         ]
       };
     }
-  } else if (biasDirection === 'SHORT') {
+  } else if (isFullConfirmation && confirmedDirection === 'SHORT') {
     const entryPrice = currentPrice;
     const resTop = validZones?.nearestResistance ? validZones.nearestResistance.top : (smc.keyResistances[0] || currentPrice + bufferAtr);
     const stopLoss = Math.max(resTop + (currAtr * 0.3), currentPrice + bufferAtr);
@@ -352,7 +447,8 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       const tp3 = entryPrice - (risk * 4.0);
 
       tradeSetup = {
-        direction: 'SELL / SHORT',
+        isConfirmed: true,
+        direction: 'SELL / SHORT (CONFIRMED ✅)',
         entryPrice: parseFloat(entryPrice.toFixed(2)),
         stopLoss: parseFloat(stopLoss.toFixed(2)),
         tp1: parseFloat(tp1.toFixed(2)),
@@ -361,7 +457,7 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
         riskDistance: parseFloat(risk.toFixed(2)),
         riskPercentage: parseFloat(((risk / entryPrice) * 100).toFixed(2)),
         riskRewardRatio: '1 : 2.5 (Avg)',
-        invalidation: `Candle closes above $${stopLoss.toFixed(2)} invalidates this Short setup.`,
+        invalidation: `Candle close above $${stopLoss.toFixed(2)} invalidates this setup.`,
         executionRules: [
           'Entry: Enter short position near entry price.',
           'Take Profit 1: Close 50% position when TP1 is hit.',
@@ -372,27 +468,28 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       };
     }
   } else {
-    // Neutral
+    // UNCONFIRMED / NO TRADE (Strict Discipline)
     tradeSetup = {
-      direction: 'WAIT / CONSOLIDATION',
+      isConfirmed: false,
+      direction: 'WAITING FOR COMPLETE CONFIRMATION',
       entryPrice: null,
       stopLoss: null,
       tp1: null,
       tp2: null,
       tp3: null,
-      invalidation: 'Market is moving sideways. Professional rule: Capital preservation. Do NOT force a trade.',
+      invalidation: 'সবকটি স্ট্র্যাটেজি কনফার্ম না হওয়া পর্যন্ত কোনো ট্রেড এন্ট্রি নিষিদ্ধ। ক্যাপিটাল রক্ষা করাই প্রথম কাজ।',
+      missingConfirmations,
       executionRules: [
-        'Wait for a clean breakout of the consolidation range.',
-        'Watch for 15m candle close above resistance or below support.',
-        'Observe volume expansion on the breakout candle.'
+        'সবগুলো ইন্ডিকেটর ও সেশন একই দিকে কনফার্ম না করা পর্যন্ত কোনো ট্রেড নেবেন না।',
+        '১ ঘণ্টার হায়ার টাইমফ্রেম ট্রেন্ডের বিপরীতে কখনোই ট্রেড করবেন না।',
+        'ফেইকআউট ও স্টপ-হান্টিং এড়াতে সম্পূর্ণ কনফার্মেশনের অপেক্ষা করুন।'
       ]
     };
   }
 
-  // Calculate estimated confluence win probability (50% base + confluence tilt)
-  const estimatedProbability = biasDirection === 'NEUTRAL'
-    ? 50
-    : Math.min(88, Math.round(50 + (absScore * 0.38)));
+  const estimatedProbability = isFullConfirmation
+    ? Math.min(92, Math.round(55 + (absScore * 0.38)))
+    : 50;
 
   return {
     symbol,
@@ -400,6 +497,7 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
     timestamp: new Date().toISOString(),
     currentPrice,
     ticker,
+    session: sessionData,
     orderbook: {
       bestBid: orderbook?.bestBid,
       bestAsk: orderbook?.bestAsk,
@@ -438,7 +536,12 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       estimatedProbability,
       signal,
       signalClass,
-      biasDirection,
+      biasDirection: confirmedDirection,
+      isFullConfirmation,
+      bullishFactorsCount,
+      bearishFactorsCount,
+      totalFactorsCount,
+      missingConfirmations,
       htfBias,
       factors
     },

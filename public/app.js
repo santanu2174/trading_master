@@ -68,7 +68,7 @@ async function loadData() {
 
 // Update UI
 function updateAnalysisUI(data, history) {
-  const { confluence, tradeSetup, currentPrice, ticker, orderbook, indicators, smc } = data;
+  const { confluence, tradeSetup, currentPrice, ticker, orderbook, indicators, smc, session } = data;
 
   // 1. Ticker Bar
   document.getElementById('currentPriceDisplay').innerText = '$' + formatPrice(currentPrice);
@@ -84,7 +84,50 @@ function updateAnalysisUI(data, history) {
     document.getElementById('markPriceDisplay').innerText = '$' + formatPrice(ticker.markPrice);
   }
 
-  // 2. Big Signal Banner
+  // 2. Institutional Trading Sessions & Killzones Bar
+  if (session) {
+    const sessionNameEl = document.getElementById('activeSessionName');
+    if (sessionNameEl) sessionNameEl.innerText = session.activeSession || 'STANDARD SESSION';
+
+    const utcEl = document.getElementById('utcClockDisplay');
+    const istEl = document.getElementById('istClockDisplay');
+    if (utcEl) utcEl.innerText = session.clocks?.utc ? `UTC: ${session.clocks.utc}` : 'UTC: --:--';
+    if (istEl) istEl.innerText = session.clocks?.ist ? `IST: ${session.clocks.ist}` : 'IST: --:--';
+
+    // Toggle Session Active Pills
+    const pillAsia = document.getElementById('pillAsia');
+    const pillLondon = document.getElementById('pillLondon');
+    const pillOverlap = document.getElementById('pillOverlap');
+    const pillNY = document.getElementById('pillNY');
+
+    if (pillAsia) pillAsia.className = `session-pill ${session.isAsiaActive ? 'active' : ''}`;
+    if (pillLondon) pillLondon.className = `session-pill ${session.isLondonActive ? 'active' : ''}`;
+    if (pillOverlap) pillOverlap.className = `session-pill overlap ${session.isOverlapActive ? 'active' : ''}`;
+    if (pillNY) pillNY.className = `session-pill ${session.isNyActive ? 'active' : ''}`;
+
+    // Asia High / Low Range Display
+    const asiaHighEl = document.getElementById('asiaHighDisplay');
+    const asiaLowEl = document.getElementById('asiaLowDisplay');
+    if (asiaHighEl) asiaHighEl.innerText = session.asiaRange?.high ? '$' + formatPrice(session.asiaRange.high) : '--';
+    if (asiaLowEl) asiaLowEl.innerText = session.asiaRange?.low ? '$' + formatPrice(session.asiaRange.low) : '--';
+
+    // Liquidity Sweep Badge
+    const sweepBadge = document.getElementById('sessionSweepBadge');
+    if (sweepBadge) {
+      if (session.liquiditySweep?.hasSweptHigh) {
+        sweepBadge.className = 'sweep-badge swept-high';
+        sweepBadge.innerText = '⚡ Swept Asia High (Supply Liquidity)';
+      } else if (session.liquiditySweep?.hasSweptLow) {
+        sweepBadge.className = 'sweep-badge swept-low';
+        sweepBadge.innerText = '⚡ Swept Asia Low (Demand Liquidity)';
+      } else {
+        sweepBadge.className = 'sweep-badge';
+        sweepBadge.innerText = 'Asia Range Intact';
+      }
+    }
+  }
+
+  // 3. Big Signal Banner
   const banner = document.getElementById('signalBanner');
   banner.className = `signal-banner ${confluence.signalClass}`;
   document.getElementById('signalBadge').innerText = confluence.signal;
@@ -94,12 +137,12 @@ function updateAnalysisUI(data, history) {
   document.getElementById('probabilityDisplay').innerText = `Estimated Accuracy: ~${confluence.estimatedProbability}%`;
 
   // Sound alert on new high-confidence signal
-  if (confluence.signal !== lastKnownSignal && confluence.signal.includes('STRONG')) {
+  if (confluence.signal !== lastKnownSignal && confluence.isFullConfirmation) {
     playAlertChime(confluence.biasDirection === 'LONG');
     lastKnownSignal = confluence.signal;
   }
 
-  // 3. Confluence Score Meter
+  // 4. Confluence Score Meter
   const bullFill = document.getElementById('meterBullFill');
   const bearFill = document.getElementById('meterBearFill');
   if (confluence.score >= 0) {
@@ -110,9 +153,25 @@ function updateAnalysisUI(data, history) {
     bullFill.style.width = '0%';
   }
 
-  // 4. Trade Setup Box
+  // 5. Actionable Trade Setup Box & Strict Confirmation Gatekeeper
+  const unconfirmedBox = document.getElementById('unconfirmedNoticeBox');
+  const confirmedBox = document.getElementById('confirmedNoticeBox');
+  const gateBadge = document.getElementById('tradeSetupGateBadge');
+  const missingList = document.getElementById('missingConfirmationsList');
   const tradeBox = document.getElementById('tradeSetupBox');
-  if (tradeSetup && tradeSetup.entryPrice) {
+
+  const isTradeConfirmed = tradeSetup && tradeSetup.isConfirmed === true && tradeSetup.entryPrice;
+
+  if (isTradeConfirmed) {
+    // FULLY CONFIRMED TRADE
+    if (unconfirmedBox) unconfirmedBox.style.display = 'none';
+    if (confirmedBox) confirmedBox.style.display = 'flex';
+    if (gateBadge) {
+      gateBadge.innerText = 'GATE: ALL CONFIRMED ✅';
+      gateBadge.style.background = 'rgba(0, 192, 118, 0.2)';
+      gateBadge.style.color = 'var(--bull-green)';
+    }
+
     tradeBox.style.display = 'block';
     document.getElementById('tradeDirection').innerText = tradeSetup.direction;
     document.getElementById('tradeDirection').className = `trade-row-val ${confluence.biasDirection === 'LONG' ? 'green' : 'red'}`;
@@ -127,16 +186,39 @@ function updateAnalysisUI(data, history) {
     // Trigger position calculator refresh
     recalcPositionSize(tradeSetup);
   } else {
+    // UNCONFIRMED / NO TRADE (Strict Gatekeeper Active)
+    if (confirmedBox) confirmedBox.style.display = 'none';
+    if (unconfirmedBox) {
+      unconfirmedBox.style.display = 'block';
+      if (missingList) {
+        const reasons = (tradeSetup && tradeSetup.missingConfirmations) || confluence.missingConfirmations || [];
+        if (reasons.length > 0) {
+          missingList.innerHTML = reasons.map(r => `<li>${r}</li>`).join('');
+        } else {
+          missingList.innerHTML = '<li>⏳ Confluence indicators are currently mixed or consolidating.</li>';
+        }
+      }
+    }
+
+    if (gateBadge) {
+      gateBadge.innerText = 'GATE: WAITING CONFIRMATION 🛑';
+      gateBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+      gateBadge.style.color = 'var(--bear-red)';
+    }
+
     tradeBox.style.display = 'block';
-    document.getElementById('tradeDirection').innerText = 'WAIT / CHOPPY';
-    document.getElementById('tradeDirection').className = 'trade-row-val';
-    document.getElementById('tradeEntry').innerText = 'No Entry (Sideways)';
-    document.getElementById('tradeSL').innerText = '--';
-    document.getElementById('tradeTP1').innerText = '--';
-    document.getElementById('tradeTP2').innerText = '--';
-    document.getElementById('tradeTP3').innerText = '--';
-    document.getElementById('tradeRR').innerText = 'N/A';
-    document.getElementById('invalidationText').innerText = tradeSetup.invalidation;
+    document.getElementById('tradeDirection').innerText = '🛑 WAITING FOR COMPLETE CONFIRMATION';
+    document.getElementById('tradeDirection').className = 'trade-row-val red';
+    document.getElementById('tradeEntry').innerText = 'No Entry (Strict Gate Active)';
+    document.getElementById('tradeSL').innerText = '-- (Pending Setup)';
+    document.getElementById('tradeTP1').innerText = '-- (Pending Setup)';
+    document.getElementById('tradeTP2').innerText = '-- (Pending Setup)';
+    document.getElementById('tradeTP3').innerText = '-- (Pending Setup)';
+    document.getElementById('tradeRR').innerText = 'WAITING';
+    document.getElementById('invalidationText').innerText = tradeSetup?.invalidation || 'সবকটি স্ট্র্যাটেজি কনফার্ম না হওয়া পর্যন্ত কোনো এন্ট্রি দেওয়া হবে না।';
+
+    // Reset position sizing display to neutral
+    recalcPositionSize(null);
   }
 
   // 5. Render Valid Institutional S/R Zones
