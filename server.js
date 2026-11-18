@@ -6,7 +6,7 @@ const path = require('path');
 const deltaApi = require('./deltaApi');
 const { analyzeTrade } = require('./confluenceEngine');
 const { sendTelegramAlert } = require('./telegramAlert');
-const { processChartImage } = require('./chartVision');
+const { processChartImage, processScalpChartImage } = require('./chartVision');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -204,12 +204,32 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/scan-scalp-chart' && req.method === 'POST') {
+      const body = await parseBody(req);
+      if (!body.image) {
+        sendJson(res, 400, { success: false, message: 'Image base64 data is required' });
+        return;
+      }
+      const apiKey = body.apiKey || appConfig.geminiApiKey || process.env.GEMINI_API_KEY;
+      const timeframe = body.timeframe || '1m';
+      try {
+        const scanResult = await processScalpChartImage(body.image, apiKey, timeframe);
+        sendJson(res, 200, { success: true, result: scanResult });
+      } catch (err) {
+        console.error('Scalp Scan Chart Error:', err);
+        sendJson(res, 500, { success: false, message: err.message });
+      }
+      return;
+    }
+
     // STATIC FILE SERVING
     let reqPath = pathname;
     if (reqPath === '/' || reqPath === '') {
       reqPath = 'index.html';
     } else if (reqPath === '/scan_chart' || reqPath === '/scan-chart') {
       reqPath = 'scan_chart.html';
+    } else if (reqPath === '/scanchart/1minscanchart' || reqPath === '/1minscanchart' || reqPath === '/1min_scanchart' || reqPath === '/scanchart/1min') {
+      reqPath = '1min_scanchart.html';
     }
 
     let filePath = path.join(PUBLIC_DIR, reqPath);

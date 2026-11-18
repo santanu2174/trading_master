@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1Min & 5Min Scalp Scanner | Smart Money Concepts (SMC, Liquidity Sweep, FVG, BOS, CHoCH)</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <style>
+    .scalp-banner-bar {
+      background: linear-gradient(90deg, rgba(236, 72, 153, 0.15), rgba(99, 102, 241, 0.15));
+      border-bottom: 1px solid rgba(236, 72, 153, 0.3);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .tf-selector-group {
+      display: flex;
+      gap: 6px;
+      background: #090d16;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .tf-scalp-btn {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .tf-scalp-btn.active {
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
+    }
+
+    .scanner-layout {
+      display: grid;
+      grid-template-columns: 1fr 430px;
+      gap: 18px;
+      padding: 18px 24px;
+      flex: 1;
+    }
+
+    @media (max-width: 1200px) {
+      .scanner-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dropzone-container {
+      background-color: var(--bg-card);
+      border: 2px dashed rgba(236, 72, 153, 0.4);
+      border-radius: 12px;
+      padding: 45px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: radial-gradient(circle at center, rgba(236, 72, 153, 0.05) 0%, rgba(15, 23, 42, 0.6) 100%);
+    }
+
+    .dropzone-container:hover, .dropzone-container.dragover {
+      border-color: #ec4899;
+      background-color: rgba(236, 72, 153, 0.1);
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.25);
+    }
+
+    .upload-icon {
+      font-size: 52px;
+      line-height: 1;
+      filter: drop-shadow(0 0 12px rgba(236, 72, 153, 0.5));
+    }
+
+    .paste-badge {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-gold);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      animation: pulseGold 2s infinite;
+    }
+
+    @keyframes pulseGold {
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+
+    .chart-canvas-wrapper {
+      position: relative;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 520px;
+    }
+
+    canvas#annotatedCanvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .overlay-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .layer-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .layer-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .layer-label input {
+      cursor: pointer;
+      accent-color: #ec4899;
+    }
+
+    .loading-spinner {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 50px 20px;
+    }
+
+    .spinner-ring {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(236, 72, 153, 0.2);
+      border-top-color: #ec4899;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .smc-factor-pill {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="logo-badge" style="background: linear-gradient(135deg, #ec4899, #f59e0b);">1M/5M SCALPER</div>
+      <div>
+        <div class="nav-title">1Min & 5Min Scalp Vision AI <span style="font-size: 12px; padding: 2px 6px; border-radius: 4px; background: rgba(236, 72, 153, 0.2); color: #f472b6;">ULTRA SCALPER</span></div>
+        <div class="nav-subtitle">High-Speed Screenshot Scanner • Liquidity Sweep, FVG, BOS & CHoCH</div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <a href="/" class="btn-secondary" style="text-decoration: none; font-weight: 600;">⚡ Delta Live Terminal</a>
+      <a href="/scan_chart" class="btn-secondary" style="text-decoration: none; font-weight: 600;">📊 15M/1H Scanner</a>
+      <button id="apiKeySettingsBtn" class="btn-secondary">⚙️ Gemini API Key (Turbo)</button>
+      <button id="guideBtn" class="btn-secondary">📖 ১মি/৫মি স্ক্যাল্পিং গাইড</button>
+    </div>
+  </header>
+
+  <!-- TIMEFRAME SELECTOR & QUICK ACTIONS BAR -->
+  <section class="scalp-banner-bar">
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+      <span style="font-weight: 700; font-size: 13px; color: #fff;">⏱️ Scalp Timeframe:</span>
+      <div class="tf-selector-group">
+        <button id="tf1mBtn" class="tf-scalp-btn active" data-tf="1m">⚡ 1-Minute (1M Ultra Scalp)</button>
+        <button id="tf5mBtn" class="tf-scalp-btn" data-tf="5m">⏱️ 5-Minute (5M Micro Intraday)</button>
+      </div>
+      <span id="activeTfBadge" style="font-size: 11px; font-family: var(--font-mono); color: #f472b6; background: rgba(236, 72, 153, 0.15); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(236, 72, 153, 0.3);">ACTIVE: 1M ULTRA SCALP</span>
+    </div>
+
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button id="sampleBullSweepBtn" class="btn-secondary" style="font-size: 11px; border-color: rgba(0, 192, 118, 0.4); color: var(--bull-green);">🟢 Demo 1M/5M Bullish Sweep Chart</button>
+      <button id="sampleBearTrapBtn" class="btn-secondary" style="font-size: 11px; border-color: rgba(255, 59, 105, 0.4); color: var(--bear-red);">🔴 Demo 1M/5M Bearish Trap Chart</button>
+    </div>
+  </section>
+
+  <!-- MAIN SCANNER LAYOUT -->
+  <main class="scanner-layout">
+
+    <!-- LEFT COLUMN: DROPZONE & ANNOTATED CANVAS -->
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+
+      <!-- DROPZONE (Visible when no image) -->
+      <div id="dropzone" class="dropzone-container">
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <div class="upload-icon">⚡📸</div>
+        <div style="font-size: 18px; font-weight: 800; color: #fff;">Drag & Drop 1M or 5M Chart Screenshot Here</div>
+        <div class="paste-badge">💡 PRO TIP: Just press Ctrl + V anywhere on this page to Paste from Clipboard!</div>
+        <div style="font-size: 12px; color: var(--text-muted); max-width: 550px; line-height: 1.5;">
+          Delta Exchange, TradingView, বা Binance থেকে <b>১ মিনিট (1m)</b> বা <b>৫ মিনিট (5m)</b> টাইমফ্রেমের চার্ট স্ক্রিনশট পেস্ট করুন। AI সরাসরি <b>Liquidity Sweep (BSL/SSL), FVG, BOS, CHoCH ও Order Block</b> এঁকে স্ক্যাল্পিং এন্ট্রি/SL/TP প্রেডিকশন দেবে।
+        </div>
+      </div>
+
+      <!-- LOADING INDICATOR -->
+      <div id="loadingIndicator" class="card loading-spinner">
+        <div class="spinner-ring"></div>
+        <div id="loadingStatusText" style="font-size: 16px; font-weight: 800; color: #fff;">Scanning 1M Micro Structure & Liquidity...</div>
+        <div style="font-size: 12px; color: var(--text-secondary);">Detecting Equal Highs/Lows Sweeps, Fair Value Gaps, BOS & CHoCH Shifts</div>
+      </div>
+
+      <!-- ANNOTATED CHART VIEWER (Visible after scan) -->
+      <div id="chartViewerCard" class="card" style="display: none; padding: 12px; gap: 10px;">
+        
+        <!-- OVERLAY CONTROLS TOOLBAR -->
+        <div class="overlay-controls">
+          <div class="layer-toggles">
+            <label class="layer-label">
+              <input type="checkbox" id="toggleSweep" checked>
+              <span style="color: #ec4899;">■ ⚡ Liquidity Sweeps</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleFVG" checked>
+              <span style="color: #eab308;">■ 🟡 FVG Imbalance</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleBOS" checked>
+              <span style="color: #38bdf8;">■ ⚡ BOS (Structure)</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleCHOCH" checked>
+              <span style="color: #d946ef;">■ 🔄 CHoCH (Reversal)</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleOB" checked>
+              <span style="color: #10b981;">■ 📦 Order Blocks</span>
+            </label>
+            <label class="layer-label">
+              <input type="checkbox" id="toggleSetup" checked>
+              <span style="color: #a855f7;">■ 🎯 Scalp Trade Setup</span>
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button id="downloadAnnotatedBtn" class="btn-secondary" style="font-size: 11px;">💾 Download Scalp Chart</button>
+            <button id="uploadNewBtn" class="btn-secondary" style="font-size: 11px;">🔄 Scan Another 1M/5M Chart</button>
+          </div>
+        </div>
+
+        <!-- CANVAS WRAPPER -->
+        <div class="chart-canvas-wrapper">
+          <canvas id="annotatedCanvas"></canvas>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+          <span id="canvasTfIndicator">Timeframe: 1M Ultra Scalp • Smart Money Concepts Overlay</span>
+          <span id="scanEngineSource">Engine: 1M/5M Scalp Vision AI</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: AI PREDICTION & SCALP TRADE SETUP -->
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+
+      <!-- DIRECTION PREDICTION BANNER -->
+      <div id="scanVerdictBanner" class="signal-banner neutral">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">
+          PREDICTED SCALP DIRECTION (1M / 5M)
+        </div>
+        <div id="scanDirectionBadge" class="signal-badge" style="font-size: 22px;">WAITING FOR 1M/5M CHART...</div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+          <span id="scanConfidenceBadge" class="signal-score-badge">Scalp Accuracy: --</span>
+          <span id="scanTrendBadge" style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Structure: --</span>
+        </div>
+      </div>
+
+      <!-- ACTIONABLE SCALP TRADE SETUP CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Actionable Scalp Trade Setup</span>
+          <span id="scalpRiskTag" style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(236, 72, 153, 0.2); color: #f472b6;">TIGHT SCALP SL</span>
+        </div>
+
+        <div class="trade-box">
+          <div class="trade-row">
+            <span class="trade-row-label">Scalp Action</span>
+            <span id="setupAction" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Entry Zone</span>
+            <span id="setupEntry" class="trade-row-val">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Tight Scalp Stop Loss</span>
+            <span id="setupSL" class="trade-row-val" style="color: var(--bear-red);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Scalp TP 1 (Quick Scalp - 50%)</span>
+            <span id="setupTP1" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Scalp TP 2 (Liquidity Pool - 30%)</span>
+            <span id="setupTP2" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Scalp TP 3 (Extension Runner)</span>
+            <span id="setupTP3" class="trade-row-val" style="color: var(--bull-green);">--</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-row-label">Risk : Reward</span>
+            <span id="setupRRR" class="trade-row-val" style="color: var(--accent-gold);">--</span>
+          </div>
+
+          <ul class="rules-list" style="margin-top: 8px;">
+            <li id="setupExecutionRule">🛡️ <b>১মি/৫মি স্ক্যাল্পিং রুল:</b> TP1 হিট হওয়ার সাথে সাথে ৫০% প্রফিট বুক করুন এবং Stop Loss সাথে সাথে Entry Price-এ সরিয়ে সম্পূর্ণ রিস্ক-ফ্রি করুন।</li>
+            <li>⚡ লিকুইডিটি সুইপের পর সুইং উইক ভাঙলে দ্রুত এক্সিট করুন। ১ মিনিটে কোনো অবস্থাতেই ইমোশনাল হবেন না।</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 5-PILLAR SMC SCALPING CHECKLIST -->
+      <div class="card">
+        <div class="card-title">
+          <span>⚡ 5-Pillar Scalping Checklist</span>
+          <span style="font-size: 11px; color: var(--accent-gold);">SMC Matrix</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;" id="smcPillarsList">
+          <div class="smc-factor-pill">
+            <span>⚡ 1. Liquidity Sweep (BSL / SSL)</span>
+            <span id="pillarSweep" style="color: var(--text-muted);">WAITING</span>
+          </div>
+          <div class="smc-factor-pill">
+            <span>🟡 2. Fair Value Gap (+FVG / -FVG)</span>
+            <span id="pillarFVG" style="color: var(--text-muted);">WAITING</span>
+          </div>
+          <div class="smc-factor-pill">
+            <span>🔷 3. Break of Structure (BOS)</span>
+            <span id="pillarBOS" style="color: var(--text-muted);">WAITING</span>
+          </div>
+          <div class="smc-factor-pill">
+            <span>🔄 4. Change of Character (CHoCH)</span>
+            <span id="pillarCHOCH" style="color: var(--text-muted);">WAITING</span>
+          </div>
+          <div class="smc-factor-pill">
+            <span>📦 5. Institutional Order Block</span>
+            <span id="pillarOB" style="color: var(--text-muted);">WAITING</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DETAILED SMC RATIONALE CARD -->
+      <div class="card">
+        <div class="card-title">
+          <span>📝 1M/5M Market Phase & Rationale</span>
+        </div>
+        <p id="scanSummaryText" style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+          ১ মিনিট বা ৫ মিনিট চার্টের স্ক্রিনশট পেস্ট করুন। AI তাত্ক্ষণিকভাবে স্মার্ট মানি কনসেপ্টস অ্যালগরিদম দিয়ে লিকুইডিটি ট্র্যাপ ও ফাস্ট এন্ট্রি জোন বিশ্লেষণ করবে।
+        </p>
+
+        <div id="smcObservationsList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- GEMINI API KEY MODAL -->
+  <div id="apiKeyModal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 16px; font-weight: 700;">⚙️ Gemini API Key (Optional Turbo Scalp Vision)</h3>
+        <button id="closeApiKeyModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+        টার্মিনালে ইতিমধ্যে ১মি/৫মি আল্ট্রা-স্ক্যাল্পিং হিউরিস্টিক ইঞ্জিন যুক্ত রয়েছে যা অফলাইনেও কাজ করে। অতিরিক্তভাবে আপনি Google Gemini Vision AI ইন্টিগ্রেট করতে চাইলে আপনার ফ্রী API Key এখানে সেট করতে পারেন:
+      </p>
+
+      <div class="input-group">
+        <label>Google Gemini API Key (<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--delta-purple);">ফ্রী API Key নিন</a>)</label>
+        <input type="text" id="geminiApiKeyInput" placeholder="AIzaSy...">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+        <button id="clearApiKeyBtn" class="btn-secondary">Clear Key</button>
+        <button id="saveApiKeyBtn" class="btn-primary">💾 Save API Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BENGALI SCALPING GUIDE MODAL -->
+  <div id="guideModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--accent-gold);">📘 ১ মিনিট ও ৫ মিনিট আল্ট্রা-স্ক্যাল্পিং গাইড</h3>
+        <button id="closeGuideModal" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <div style="font-size: 13px; line-height: 1.7; color: var(--text-primary); display: flex; flex-direction: column; gap: 14px;">
+        <p>
+          ১ মিনিট (1M) এবং ৫ মিনিট (5M) টাইমফ্রেমে প্রফিটেবল স্ক্যাল্পিংয়ের মূল কৌশল হলো <b>Smart Money Concepts (SMC) & ICT Liquidity Framework</b>:
+        </p>
+
+        <div style="background: rgba(236, 72, 153, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid #ec4899;">
+          <b style="color: #fff;">⚡ ১মি/৫মি চার্টে চিহ্নিত মূল ৫টি সংকেত:</b>
+          <ul style="margin-left: 18px; margin-top: 6px;">
+            <li><b>1. Liquidity Sweep (BSL / SSL):</b> রিটেইল ট্রেডারদের স্টপ লস যেখানে থাকে (Equal Highs বা Equal Lows), মার্কেট মেকাররা দ্রুত সেই লেভেল ব্রেক করে রিভার্সাল নেয়। একে সুইপ বা Judas Swing বলে।</li>
+            <li><b>2. FVG (Fair Value Gap - হলুদ বক্স):</b> বড় ক্যান্ডেলের গতির কারণে ৩টি ক্যান্ডেলের মাঝে তৈরি শূন্যস্থান। প্রাইস এই গ্যাপ পূর্ণ করতে রিটেস্ট করলে পারফেক্ট স্ক্যাল্প এন্ট্রি পাওয়া যায়।</li>
+            <li><b>3. BOS (Break of Structure - নীল লাইন):</b> মোমেন্টামের দিকে ক্যান্ডেলের বডি দিয়ে পূর্ববর্তী হাই/লো ভেঙে ট্রেন্ড অব্যাহত রাখা।</li>
+            <li><b>4. CHoCH (Change of Character - গোলাপি লাইন):</b> ট্রেন্ড রিভার্সাল বা গতি পরিবর্তনের প্রাথমিক সংকেত। আপট্রেন্ড থেকে ডাউনট্রেন্ড বা ডাউনট্রেন্ড থেকে আপট্রেন্ড হওয়ার মুহূর্ত।</li>
+            <li><b>5. Order Block (+OB / -OB):</b> যেখান থেকে বড় মুভমেন্ট শুরু হয়েছিল সেই ক্যান্ডেল যা ডিমান্ড বা সাপ্লাই জোন হিসেবে কাজ করে।</li>
+          </ul>
+        </div>
+
+        <div style="background: rgba(0, 192, 118, 0.1); padding: 12px; border-radius: 6px; border-left: 3px solid var(--bull-green);">
+          <b style="color: var(--bull-green);">🛡️ স্ক্যাল্পারদের জন্য ৩টি সুবর্ণ নিয়ম:</b>
+          <ol style="margin-left: 18px; margin-top: 6px;">
+            <li>কখনোই ব্রেকআউট দেখে তাড়াহুড়ো করে এন্ট্রি নিবেন না। সবসময় <b>Liquidity Sweep হওয়ার পর রিভার্সাল ক্যান্ডেল ক্লোজের</b> অপেক্ষা করবেন।</li>
+            <li>১ মিনিটের চার্টে SL সবসময় টাইট রাখবেন (সুইপ উইকের ঠিক নিচে বা উপরে)।</li>
+            <li>TP1 হিট হলে ৫০% লাভ নিশ্চিত করবেন এবং SL এন্ট্রি প্রাইসে নিয়ে রিস্ক সম্পূর্ণ জিরো করবেন।</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/1min_scanchart.js"></script>
+</body>
+</html>
