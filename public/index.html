@@ -280,8 +280,69 @@
 
     </div>
 
-    <!-- CENTER COLUMN: INTERACTIVE CHART -->
+    <!-- CENTER COLUMN: RADAR & INTERACTIVE CHART -->
     <div style="display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- PREDICTIVE MARKET FALL & RISE RADAR CARD -->
+      <div id="fallRiseRadarCard" class="card" style="padding: 16px; border: 2px solid rgba(239, 68, 68, 0.4); background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(15, 23, 42, 0.9));">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="fallRisePulseIcon" style="font-size: 26px; line-height: 1;">🔻</span>
+            <div>
+              <div id="fallRiseTitle" style="font-size: 15px; font-weight: 800; color: var(--bear-red); text-transform: uppercase; letter-spacing: 0.5px;">
+                ⚠️ MARKET FALL WARNING (DUMP DETECTED)
+              </div>
+              <div id="fallRiseSubtitle" style="font-size: 12px; color: var(--text-secondary);">
+                মার্কেট দ্রুত নিচে পড়বে (Sell / Short সিগন্যাল অ্যাক্টিভ)
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="fallRiseAccuracyBadge" style="font-size: 12px; font-family: var(--font-mono); font-weight: 700; background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.4);">
+              Fall Probability: 86%
+            </span>
+            <button id="radarVoiceBtn" class="btn-secondary" style="font-size: 11px; padding: 4px 8px;">🔊 Voice Alert</button>
+          </div>
+        </div>
+
+        <!-- DIRECT ACTION CALLOUT BOX -->
+        <div id="fallRiseActionBox" style="background: rgba(0, 0, 0, 0.45); border-radius: 8px; padding: 12px 16px; border: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-size: 11px; text-transform: uppercase; color: var(--accent-gold); font-family: var(--font-mono); font-weight: 700;">
+              🎯 DIRECT ENTRY INSTRUCTION (সরাসরি এন্ট্রি নির্দেশ):
+            </div>
+            <div id="fallRiseDirectEntry" style="font-size: 18px; font-weight: 800; color: var(--bear-red); font-family: var(--font-mono); margin-top: 3px;">
+              🔴 এখনই SELL / SHORT এন্ট্রি নিন: $67,420
+            </div>
+            <div id="fallRiseTargetsText" style="font-size: 12px; font-family: var(--font-mono); color: #cbd5e1; margin-top: 4px;">
+              Stop Loss: $68,150 • TP1: $66,500 • TP2: $65,600
+            </div>
+          </div>
+
+          <!-- Probability Gauge Bar -->
+          <div style="min-width: 190px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); margin-bottom: 4px;">
+              <span style="color: var(--bear-red);">FALL: <b id="barFallPct">86%</b></span>
+              <span style="color: var(--bull-green);">RISE: <b id="barRisePct">14%</b></span>
+            </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex;">
+              <div id="barFallFill" style="width: 86%; background: var(--bear-red); transition: width 0.3s;"></div>
+              <div id="barRiseFill" style="width: 14%; background: var(--bull-green); transition: width 0.3s;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WHY IT WILL FALL / RISE (TECHNICAL CATALYSTS) -->
+        <div style="margin-top: 10px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">
+            🔍 কেন মার্কেট পড়বে বা উঠবে? (Live Technical Triggers):
+          </div>
+          <ul id="fallRiseCatalystsList" style="margin: 0; padding-left: 18px; font-size: 11px; color: var(--text-primary); line-height: 1.6; font-family: var(--font-mono);">
+            <!-- Populated dynamically -->
+          </ul>
+        </div>
+      </div>
+
       <div class="card" style="padding: 12px; height: 100%;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div class="card-title" style="margin: 0;">

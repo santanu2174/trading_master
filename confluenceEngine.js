@@ -383,7 +383,93 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
     }
   }
 
-  // 7. Determine Signal & Build Trade Setup
+  // 7. PREDICTIVE MARKET FALL & RISE RADAR ENGINE
+  const bufferAtr = currAtr * 1.5;
+  const supBottom = validZones?.nearestSupport ? validZones.nearestSupport.bottom : (smc.keySupports[0] || currentPrice - bufferAtr);
+  const resTop = validZones?.nearestResistance ? validZones.nearestResistance.top : (smc.keyResistances[0] || currentPrice + bufferAtr);
+
+  let fallRiseDirection = 'CONSOLIDATION';
+  let fallProbability = 50;
+  let riseProbability = 50;
+  let fallRiseTitle = '⚖️ ACCUMULATION / PRE-BREAKOUT ⏳';
+  let fallRiseBengali = 'মার্কেট রেঞ্জে ঘুরছে (ব্রেকআউটের জন্য অপেক্ষা করুন)';
+  let fallRiseAction = '⏳ সাপোর্ট বা রেজিস্ট্যান্সে লিমিট এন্ট্রি রাখুন';
+  const fallRiseCatalysts = [];
+
+  // Determine if Market is about to FALL or RISE
+  if (finalScore <= -15 || (htfBias === 'BEARISH' && bearishFactorsCount >= 3)) {
+    fallRiseDirection = 'FALL';
+    fallProbability = Math.min(95, Math.max(65, Math.round(55 + (Math.abs(finalScore) * 0.45))));
+    riseProbability = 100 - fallProbability;
+    fallRiseTitle = '⚠️ CRITICAL FALL WARNING: MARKET WILL DUMP (DOWN) 🔻';
+    fallRiseBengali = 'মার্কেট দ্রুত নিচে পড়বে (FALL / SHORT সিগন্যাল অ্যাক্টিভ) 🔻';
+    fallRiseAction = `🔴 এখনই SELL / SHORT এন্ট্রি নিন: $${currentPrice.toFixed(2)}`;
+
+    if (htfBias === 'BEARISH') fallRiseCatalysts.push('১ ঘণ্টার ম্যাক্রো ট্রেন্ড শক্তিশালী বিয়ারিশ মোমেন্টামে রয়েছে।');
+    if (divergence.type.includes('BEARISH')) fallRiseCatalysts.push(`RSI বিয়ারিশ ডাইভারজেন্স (${divergence.type}): প্রাইস দুর্বল হচ্ছে।`);
+    if (sessionData?.asiaRange?.status?.includes('HIGH_SWEPT')) fallRiseCatalysts.push('এশিয়ান হাই ট্র্যাপ সুইপ করে সেলাররা মার্কেট পুশ করছে (Judas Swing)।');
+    if (currSupertrend === 'BEARISH') fallRiseCatalysts.push('সুপারট্রেন্ড (১০, ৩) রেড সিগন্যালে রেজিস্ট্যান্স তৈরি করেছে।');
+    if (orderbook && orderbook.askRatio >= 52) fallRiseCatalysts.push(`অর্ডারবুকে বিক্রেতাদের চাপ dominant (${orderbook.askRatio}% Asks)।`);
+    if (validZones?.nearestResistance) fallRiseCatalysts.push(`রেজিস্ট্যান্স সাপ্লাই জোন ($${validZones.nearestResistance.bottom} - $${validZones.nearestResistance.top}) থেকে রিজেকশন।`);
+    if (fallRiseCatalysts.length === 0) fallRiseCatalysts.push('বিয়ারিশ মোমেন্টাম ও সেলিং প্রেসার বৃদ্ধি পাচ্ছে।');
+  } else if (finalScore >= 15 || (htfBias === 'BULLISH' && bullishFactorsCount >= 3)) {
+    fallRiseDirection = 'RISE';
+    riseProbability = Math.min(95, Math.max(65, Math.round(55 + (finalScore * 0.45))));
+    fallProbability = 100 - riseProbability;
+    fallRiseTitle = '🚀 EXPLOSIVE RISE WARNING: MARKET WILL PUMP (UP) 🚀';
+    fallRiseBengali = 'মার্কেট দ্রুত উপরে উঠবে (RISE / LONG সিগন্যাল অ্যাক্টিভ) 🚀';
+    fallRiseAction = `🟢 এখনই BUY / LONG এন্ট্রি নিন: $${currentPrice.toFixed(2)}`;
+
+    if (htfBias === 'BULLISH') fallRiseCatalysts.push('১ ঘণ্টার ম্যাক্রো ট্রেন্ড শক্তিশালী বুলিশ মোমেন্টামে রয়েছে।');
+    if (divergence.type.includes('BULLISH')) fallRiseCatalysts.push(`RSI বুলিশ ডাইভারজেন্স (${divergence.type}): বাউন্স প্রত্যাশিত।`);
+    if (sessionData?.asiaRange?.status?.includes('LOW_SWEPT')) fallRiseCatalysts.push('এশিয়ান লো সুইপ করে বায়াররা এন্ট্রি নিয়েছে (Turtle Soup Spring)।');
+    if (currSupertrend === 'BULLISH') fallRiseCatalysts.push('সুপারট্রেন্ড (১০, ৩) গ্রিন সিগন্যালে ডায়নামিক সাপোর্ট দিচ্ছে।');
+    if (orderbook && orderbook.bidRatio >= 52) fallRiseCatalysts.push(`অর্ডারবুকে ক্রেতাদের চাপ dominant (${orderbook.bidRatio}% Bids)।`);
+    if (validZones?.nearestSupport) fallRiseCatalysts.push(`সাপোর্ট ডিমান্ড জোন ($${validZones.nearestSupport.bottom} - $${validZones.nearestSupport.top}) থেকে বাউন্স।`);
+    if (fallRiseCatalysts.length === 0) fallRiseCatalysts.push('বুলিশ মোমেন্টাম ও বায়িং প্রেসার বৃদ্ধি পাচ্ছে।');
+  } else {
+    fallRiseCatalysts.push('মার্কেট বর্তমানে কনসোলিডেশন জোনে রয়েছে।');
+    if (validZones?.nearestSupport) fallRiseCatalysts.push(`Buy Limit Setup: সাপোর্ট $${validZones.nearestSupport.bottom} এ এলে বাই করুন।`);
+    if (validZones?.nearestResistance) fallRiseCatalysts.push(`Sell Limit Setup: রেজিস্ট্যান্স $${validZones.nearestResistance.top} এ গেলে শর্ট করুন।`);
+  }
+
+  // Calculate Entry, SL, TP for Fall or Rise
+  let calculatedSL, calculatedTP1, calculatedTP2, calculatedTP3, calculatedRisk;
+  if (fallRiseDirection === 'FALL') {
+    calculatedSL = parseFloat(Math.max(resTop + (currAtr * 0.3), currentPrice + bufferAtr).toFixed(2));
+    calculatedRisk = calculatedSL - currentPrice;
+    calculatedTP1 = parseFloat((currentPrice - (calculatedRisk * 1.5)).toFixed(2));
+    calculatedTP2 = parseFloat((currentPrice - (calculatedRisk * 2.5)).toFixed(2));
+    calculatedTP3 = parseFloat((currentPrice - (calculatedRisk * 4.0)).toFixed(2));
+  } else {
+    calculatedSL = parseFloat(Math.min(supBottom - (currAtr * 0.3), currentPrice - bufferAtr).toFixed(2));
+    calculatedRisk = currentPrice - calculatedSL;
+    calculatedTP1 = parseFloat((currentPrice + (calculatedRisk * 1.5)).toFixed(2));
+    calculatedTP2 = parseFloat((currentPrice + (calculatedRisk * 2.5)).toFixed(2));
+    calculatedTP3 = parseFloat((currentPrice + (calculatedRisk * 4.0)).toFixed(2));
+  }
+
+  const fallRisePredictor = {
+    direction: fallRiseDirection,
+    title: fallRiseTitle,
+    movementBengali: fallRiseBengali,
+    actionCommand: fallRiseAction,
+    fallProbability,
+    riseProbability,
+    entryPrice: parseFloat(currentPrice.toFixed(2)),
+    stopLoss: calculatedSL,
+    tp1: calculatedTP1,
+    tp2: calculatedTP2,
+    tp3: calculatedTP3,
+    riskRewardRatio: '1 : 2.5 (Avg)',
+    catalysts: fallRiseCatalysts,
+    executionRules: [
+      '🛡️ এন্ট্রি নেওয়ার পর TP1 হিট হলে ৫০% লাভ তুলে নিন এবং Stop Loss এন্ট্রি প্রাইসে নিয়ে রিস্ক জিরো করুন।',
+      '⚡ ১ ঘণ্টার হায়ার টাইমফ্রেম ট্রেন্ডের সাথে ট্রেড রাখুন।'
+    ]
+  };
+
+  // 8. Determine Signal & Build Trade Setup
   let signal = 'NEUTRAL / WAIT FOR CONFIRMATION';
   let signalClass = 'neutral';
 
@@ -393,99 +479,39 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
   } else if (isFullConfirmation && confirmedDirection === 'SHORT') {
     signal = '🚀 FULL CONFIRMATION: STRONG SHORT (SELL)';
     signalClass = 'strong-sell';
+  } else if (fallRiseDirection === 'FALL') {
+    signal = '🔻 MARKET FALL PREDICTION: SHORT TRIGGER';
+    signalClass = 'strong-sell';
+  } else if (fallRiseDirection === 'RISE') {
+    signal = '🚀 MARKET RISE PREDICTION: LONG TRIGGER';
+    signalClass = 'strong-buy';
   } else {
-    signal = '⏳ WAITING FOR COMPLETE CONFIRMATION (NO TRADE)';
+    signal = '⏳ CONSOLIDATION / WAITING FOR BREAKOUT';
     signalClass = 'neutral';
-    confirmedDirection = 'NEUTRAL';
   }
 
-  let tradeSetup = null;
-  const bufferAtr = currAtr * 1.5;
+  const tradeDirectionLabel = isFullConfirmation
+    ? (confirmedDirection === 'LONG' ? 'BUY / LONG (CONFIRMED ✅)' : 'SELL / SHORT (CONFIRMED ✅)')
+    : (fallRiseDirection === 'FALL' ? 'SELL / SHORT (MOMENTUM TRIGGER ⚡)' : fallRiseDirection === 'RISE' ? 'BUY / LONG (MOMENTUM TRIGGER ⚡)' : 'WAITING FOR BREAKOUT');
 
-  // STRICT RULE: If not fully confirmed, DO NOT GIVE ENTRY/SL/TP!
-  if (isFullConfirmation && confirmedDirection === 'LONG') {
-    const entryPrice = currentPrice;
-    const supBottom = validZones?.nearestSupport ? validZones.nearestSupport.bottom : (smc.keySupports[0] || currentPrice - bufferAtr);
-    const stopLoss = Math.min(supBottom - (currAtr * 0.3), currentPrice - bufferAtr);
-    const risk = entryPrice - stopLoss;
-
-    if (risk > 0) {
-      const tp1 = entryPrice + (risk * 1.5);
-      const tp2 = entryPrice + (risk * 2.5);
-      const tp3 = entryPrice + (risk * 4.0);
-
-      tradeSetup = {
-        isConfirmed: true,
-        direction: 'BUY / LONG (CONFIRMED ✅)',
-        entryPrice: parseFloat(entryPrice.toFixed(2)),
-        stopLoss: parseFloat(stopLoss.toFixed(2)),
-        tp1: parseFloat(tp1.toFixed(2)),
-        tp2: parseFloat(tp2.toFixed(2)),
-        tp3: parseFloat(tp3.toFixed(2)),
-        riskDistance: parseFloat(risk.toFixed(2)),
-        riskPercentage: parseFloat(((risk / entryPrice) * 100).toFixed(2)),
-        riskRewardRatio: '1 : 2.5 (Avg)',
-        invalidation: `Candle close below $${stopLoss.toFixed(2)} invalidates this setup.`,
-        executionRules: [
-          'Entry: Enter market or limit order near entry price.',
-          'Take Profit 1: Close 50% position when TP1 is hit.',
-          'Stop Loss to Breakeven: Immediately trail SL to entry price once TP1 is hit (0 risk runner).',
-          'Take Profit 2: Close remaining 30% position at TP2.',
-          'Take Profit 3: Trail remaining 20% position with SuperTrend or TP3.'
-        ]
-      };
-    }
-  } else if (isFullConfirmation && confirmedDirection === 'SHORT') {
-    const entryPrice = currentPrice;
-    const resTop = validZones?.nearestResistance ? validZones.nearestResistance.top : (smc.keyResistances[0] || currentPrice + bufferAtr);
-    const stopLoss = Math.max(resTop + (currAtr * 0.3), currentPrice + bufferAtr);
-    const risk = stopLoss - entryPrice;
-
-    if (risk > 0) {
-      const tp1 = entryPrice - (risk * 1.5);
-      const tp2 = entryPrice - (risk * 2.5);
-      const tp3 = entryPrice - (risk * 4.0);
-
-      tradeSetup = {
-        isConfirmed: true,
-        direction: 'SELL / SHORT (CONFIRMED ✅)',
-        entryPrice: parseFloat(entryPrice.toFixed(2)),
-        stopLoss: parseFloat(stopLoss.toFixed(2)),
-        tp1: parseFloat(tp1.toFixed(2)),
-        tp2: parseFloat(tp2.toFixed(2)),
-        tp3: parseFloat(tp3.toFixed(2)),
-        riskDistance: parseFloat(risk.toFixed(2)),
-        riskPercentage: parseFloat(((risk / entryPrice) * 100).toFixed(2)),
-        riskRewardRatio: '1 : 2.5 (Avg)',
-        invalidation: `Candle close above $${stopLoss.toFixed(2)} invalidates this setup.`,
-        executionRules: [
-          'Entry: Enter short position near entry price.',
-          'Take Profit 1: Close 50% position when TP1 is hit.',
-          'Stop Loss to Breakeven: Immediately trail SL to entry price once TP1 is hit.',
-          'Take Profit 2: Close remaining 30% position at TP2.',
-          'Take Profit 3: Trail remaining 20% position with SuperTrend or TP3.'
-        ]
-      };
-    }
-  } else {
-    // UNCONFIRMED / NO TRADE (Strict Discipline)
-    tradeSetup = {
-      isConfirmed: false,
-      direction: 'WAITING FOR COMPLETE CONFIRMATION',
-      entryPrice: null,
-      stopLoss: null,
-      tp1: null,
-      tp2: null,
-      tp3: null,
-      invalidation: 'সবকটি স্ট্র্যাটেজি কনফার্ম না হওয়া পর্যন্ত কোনো ট্রেড এন্ট্রি নিষিদ্ধ। ক্যাপিটাল রক্ষা করাই প্রথম কাজ।',
-      missingConfirmations,
-      executionRules: [
-        'সবগুলো ইন্ডিকেটর ও সেশন একই দিকে কনফার্ম না করা পর্যন্ত কোনো ট্রেড নেবেন না।',
-        '১ ঘণ্টার হায়ার টাইমফ্রেম ট্রেন্ডের বিপরীতে কখনোই ট্রেড করবেন না।',
-        'ফেইকআউট ও স্টপ-হান্টিং এড়াতে সম্পূর্ণ কনফার্মেশনের অপেক্ষা করুন।'
-      ]
-    };
-  }
+  const tradeSetup = {
+    isConfirmed: isFullConfirmation,
+    direction: tradeDirectionLabel,
+    entryPrice: parseFloat(currentPrice.toFixed(2)),
+    stopLoss: calculatedSL,
+    tp1: calculatedTP1,
+    tp2: calculatedTP2,
+    tp3: calculatedTP3,
+    riskDistance: parseFloat(Math.abs(currentPrice - calculatedSL).toFixed(2)),
+    riskPercentage: parseFloat(((Math.abs(currentPrice - calculatedSL) / currentPrice) * 100).toFixed(2)),
+    riskRewardRatio: '1 : 2.5 (Avg)',
+    invalidation: fallRiseDirection === 'FALL' ? `Candle close above $${calculatedSL} invalidates setup.` : `Candle close below $${calculatedSL} invalidates setup.`,
+    missingConfirmations,
+    executionRules: [
+      'TP1 হিট হলে ৫০% প্রফিট বুক করুন এবং Stop Loss সাথে সাথে Entry Price (Cost-to-Cost)-এ সরিয়ে নিন।',
+      'ট্রেন্ড কনফার্মেশন ও মোমেন্টামের সাথে ট্রেড করুন।'
+    ]
+  };
 
   const estimatedProbability = isFullConfirmation
     ? Math.min(92, Math.round(55 + (absScore * 0.38)))
@@ -545,6 +571,7 @@ async function analyzeTrade(symbol = 'BTCUSD', executionTf = '15m') {
       htfBias,
       factors
     },
+    fallRisePredictor,
     tradeSetup
   };
 }

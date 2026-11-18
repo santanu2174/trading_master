@@ -286,6 +286,47 @@ class TradingChart {
       }
     }
 
+    // Draw Direct Fall / Rise Entry Marker on the latest candle
+    const predictor = this.analysis?.fallRisePredictor;
+    if (predictor && lastCandle && visibleCandles.length > 0) {
+      const lastX = getX(visibleCandles.length - 1);
+      ctx.save();
+      if (predictor.direction === 'FALL') {
+        const arrowY = getY(lastCandle.high) - 16;
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('▼', lastX, arrowY);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(lastX - 60, arrowY - 24, 120, 20);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(lastX - 60, arrowY - 24, 120, 20);
+
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText('▼ SELL / FALL ENTRY', lastX, arrowY - 10);
+      } else if (predictor.direction === 'RISE') {
+        const arrowY = getY(lastCandle.low) + 22;
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('▲', lastX, arrowY);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(lastX - 60, arrowY + 6, 120, 20);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(lastX - 60, arrowY + 6, 120, 20);
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText('▲ BUY / RISE ENTRY', lastX, arrowY + 20);
+      }
+      ctx.restore();
+    }
+
     // Crosshair and Inspection Tooltip
     if (this.isHovering && hoveredCandle) {
       ctx.setLineDash([2, 2]);
