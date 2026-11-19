@@ -195,7 +195,7 @@ const server = http.createServer(async (req, res) => {
       }
       const apiKey = body.apiKey || appConfig.geminiApiKey || process.env.GEMINI_API_KEY;
       try {
-        const scanResult = await processChartImage(body.image, apiKey);
+        const scanResult = await processChartImage(body.image, apiKey, body.visualMetrics);
         sendJson(res, 200, { success: true, result: scanResult });
       } catch (err) {
         console.error('Scan Chart Error:', err);
@@ -213,7 +213,7 @@ const server = http.createServer(async (req, res) => {
       const apiKey = body.apiKey || appConfig.geminiApiKey || process.env.GEMINI_API_KEY;
       const timeframe = body.timeframe || '1m';
       try {
-        const scanResult = await processScalpChartImage(body.image, apiKey, timeframe);
+        const scanResult = await processScalpChartImage(body.image, apiKey, timeframe, body.visualMetrics);
         sendJson(res, 200, { success: true, result: scanResult });
       } catch (err) {
         console.error('Scalp Scan Chart Error:', err);

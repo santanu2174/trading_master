@@ -179,6 +179,123 @@ function handleImageFile(file) {
   reader.readAsDataURL(file);
 }
 
+// Computer Vision: Pixel-level chart trend & level analysis on client canvas
+function extractChartVisualMetrics(img) {
+  try {
+    const canvas = document.createElement('canvas');
+    const w = Math.min(img.naturalWidth || 800, 800);
+    const h = Math.min(img.naturalHeight || 500, 500);
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    const startX = Math.floor(w * 0.05);
+    const endX = Math.floor(w * 0.92);
+    const startY = Math.floor(h * 0.08);
+    const endY = Math.floor(h * 0.92);
+
+    const numSlices = 12;
+    const sliceWidth = (endX - startX) / numSlices;
+
+    let totalGreen = 0;
+    let totalRed = 0;
+    const sliceCenters = [];
+    const sliceHighs = [];
+    const sliceLows = [];
+
+    for (let s = 0; s < numSlices; s++) {
+      const sX1 = Math.floor(startX + s * sliceWidth);
+      const sX2 = Math.floor(startX + (s + 1) * sliceWidth);
+
+      let greenCount = 0;
+      let redCount = 0;
+      let minY = endY;
+      let maxY = startY;
+      let sumY = 0;
+      let countY = 0;
+
+      for (let x = sX1; x < sX2; x += 2) {
+        for (let y = startY; y < endY; y += 2) {
+          const idx = (y * w + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          const isGreen = (g > r + 18 && g > b + 10) || (g > 130 && r < 100 && b < 120);
+          const isRed = (r > g + 20 && r > b + 12) || (r > 150 && g < 100 && b < 100);
+
+          if (isGreen) {
+            greenCount++;
+            sumY += y;
+            countY++;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          } else if (isRed) {
+            redCount++;
+            sumY += y;
+            countY++;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      totalGreen += greenCount;
+      totalRed += redCount;
+      const avgY = countY > 0 ? (sumY / countY) : (sliceCenters.length > 0 ? sliceCenters[sliceCenters.length - 1] : h * 0.5);
+      sliceCenters.push(avgY);
+      sliceHighs.push(minY);
+      sliceLows.push(maxY);
+    }
+
+    const leftHalf = sliceCenters.slice(0, 6);
+    const rightHalf = sliceCenters.slice(6, 12);
+    const leftAvgY = leftHalf.reduce((a, b) => a + b, 0) / leftHalf.length;
+    const rightAvgY = rightHalf.reduce((a, b) => a + b, 0) / rightHalf.length;
+
+    const recent3 = sliceCenters.slice(9, 12);
+    const prev3 = sliceCenters.slice(6, 9);
+    const recentAvgY = recent3.reduce((a, b) => a + b, 0) / 3;
+    const prevAvgY = prev3.reduce((a, b) => a + b, 0) / 3;
+
+    const overallTrendScore = (leftAvgY - rightAvgY);
+    const recentTrendScore = (prevAvgY - recentAvgY);
+    const colorBias = (totalGreen - totalRed) * 0.05;
+
+    const combinedScore = (overallTrendScore * 1.5) + (recentTrendScore * 2.0) + colorBias;
+    const isBullish = combinedScore >= 0;
+
+    const validHighs = sliceHighs.filter(y => y < endY);
+    const validLows = sliceLows.filter(y => y > startY);
+    const minObservedY = validHighs.length > 0 ? Math.min(...validHighs) : h * 0.20;
+    const maxObservedY = validLows.length > 0 ? Math.max(...validLows) : h * 0.80;
+
+    const swingHighNorm = Math.max(12, Math.min(36, Math.round((minObservedY / h) * 100)));
+    const swingLowNorm = Math.max(64, Math.min(88, Math.round((maxObservedY / h) * 100)));
+    const currentPriceNorm = Math.max(20, Math.min(80, Math.round((rightAvgY / h) * 100)));
+
+    const confidence = Math.min(95, Math.max(80, Math.round(78 + Math.min(16, Math.abs(combinedScore) / 8))));
+
+    return {
+      isBullish,
+      direction: isBullish ? 'LONG' : 'SHORT',
+      confidence,
+      swingHighY: swingHighNorm,
+      swingLowY: swingLowNorm,
+      currentPriceY: currentPriceNorm,
+      greenRatio: Math.round((totalGreen / (totalGreen + totalRed + 1)) * 100),
+      redRatio: Math.round((totalRed / (totalGreen + totalRed + 1)) * 100)
+    };
+  } catch (e) {
+    console.warn('Canvas pixel extraction failed:', e);
+    return null;
+  }
+}
+
 // Send base64 image to server API
 async function sendChartForAnalysis(base64Url) {
   const dropzone = document.getElementById('dropzone');
@@ -202,6 +319,9 @@ async function sendChartForAnalysis(base64Url) {
     uploadedImageElement.onload = resolve;
   });
 
+  // Extract pixel-level computer vision metrics from uploaded chart
+  const visualMetrics = extractChartVisualMetrics(uploadedImageElement);
+
   // Check saved Gemini API Key
   const savedKey = localStorage.getItem('gemini_api_key') || '';
 
@@ -212,7 +332,8 @@ async function sendChartForAnalysis(base64Url) {
       body: JSON.stringify({
         image: base64Url,
         apiKey: savedKey,
-        timeframe: currentScalpTimeframe
+        timeframe: currentScalpTimeframe,
+        visualMetrics
       })
     });
 

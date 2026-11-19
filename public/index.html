@@ -25,7 +25,7 @@
         <span>DELTA LIVE FEED</span>
       </div>
       <a href="/scanchart/1minscanchart" class="btn-primary" style="text-decoration: none; background: linear-gradient(135deg, #f43f5e, #fb923c); font-weight: 700;">⚡ 1M/5M Scalp Scanner</a>
-      <a href="/scan_chart" class="btn-primary" style="text-decoration: none; background: linear-gradient(135deg, #ec4899, #8b5cf6); font-weight: 700;">📸 Scan Chart (SMC / FVG)</a>
+      <a href="/scan_chart" class="btn-primary" style="text-decoration: none; background: linear-gradient(135deg, #ec4899, #8b5cf6); font-weight: 700;">📸 Scan Chart (SMC / FVG / BOS)</a>
       <button id="guideBtn" class="btn-secondary">📖 বাংলায় ট্রেডিং গাইড</button>
       <button id="audioToggleBtn" class="btn-secondary">🔊 Sound On</button>
       <button id="tgSettingsBtn" class="btn-secondary">📱 Telegram Alerts</button>
@@ -82,52 +82,6 @@
     </div>
   </section>
 
-  <!-- INSTITUTIONAL TRADING SESSIONS & KILLZONES BAR -->
-  <section class="sessions-bar">
-    <div class="session-info-left">
-      <div class="session-active-indicator">
-        <span class="session-pulse-dot"></span>
-        <span id="activeSessionName">ANALYZING SESSION...</span>
-      </div>
-      <div class="session-clocks">
-        <span id="utcClockDisplay">UTC: --:--</span> • <span id="istClockDisplay">IST: --:--</span>
-      </div>
-    </div>
-
-    <!-- SESSIONS LIST PILLS -->
-    <div class="session-pills-list">
-      <div id="pillAsia" class="session-pill">
-        <span class="pill-dot"></span>
-        <span>Asia (00-08 UTC)</span>
-      </div>
-      <div id="pillLondon" class="session-pill">
-        <span class="pill-dot"></span>
-        <span>London (07-16 UTC)</span>
-      </div>
-      <div id="pillOverlap" class="session-pill overlap">
-        <span class="pill-dot"></span>
-        <span>⚡ London/NY Overlap (12-16 UTC)</span>
-      </div>
-      <div id="pillNY" class="session-pill">
-        <span class="pill-dot"></span>
-        <span>New York (12-21 UTC)</span>
-      </div>
-    </div>
-
-    <!-- ASIA RANGE & LIQUIDITY SWEEP STATUS -->
-    <div class="asia-range-box">
-      <div class="asia-level">
-        <span class="level-lbl">Asia H:</span>
-        <span id="asiaHighDisplay" class="level-val">--</span>
-      </div>
-      <div class="asia-level">
-        <span class="level-lbl">Asia L:</span>
-        <span id="asiaLowDisplay" class="level-val">--</span>
-      </div>
-      <span id="sessionSweepBadge" class="sweep-badge">Range Intact</span>
-    </div>
-  </section>
-
   <!-- MAIN TERMINAL LAYOUT -->
   <main class="main-container">
 
@@ -164,34 +118,7 @@
       <div class="card">
         <div class="card-title">
           <span>🎯 Actionable Trade Setup</span>
-          <span id="tradeSetupGateBadge" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; background: rgba(239, 68, 68, 0.2); color: var(--bear-red);">GATE: STRICT CONFIRMATION</span>
-        </div>
-
-        <!-- UNCONFIRMED NOTICE BOX (SHOWS WHEN ANY STRATEGY IS MISSING) -->
-        <div id="unconfirmedNoticeBox" class="unconfirmed-notice-box">
-          <div class="unconfirmed-header">
-            <span class="unconfirmed-icon">🛑</span>
-            <div>
-              <div class="unconfirmed-title">WAITING FOR COMPLETE CONFIRMATION (NO TRADE)</div>
-              <div class="unconfirmed-subtitle">অসম্পূর্ণ কনফার্মেশন নিয়ে কোনো ট্রেড এন্ট্রি দেওয়া হবে না</div>
-            </div>
-          </div>
-          <div class="unconfirmed-reason-title">Pending / Missing Criteria:</div>
-          <ul id="missingConfirmationsList" class="missing-list">
-            <!-- Dynamically populated from backend -->
-          </ul>
-          <div class="capital-protection-note">
-            🛡️ <b>ক্যাপিটাল প্রোটেকশন রুল:</b> ৮টি স্ট্র্যাটেজি ও সেশন কনফার্ম না হওয়া পর্যন্ত কোনো অন্ধ এন্ট্রি নিষিদ্ধ। অপেক্ষা করাই সঠিক ট্রেডারের লক্ষণ।
-          </div>
-        </div>
-
-        <!-- CONFIRMED NOTICE BOX (SHOWS ONLY WHEN 100% CONFIRMED) -->
-        <div id="confirmedNoticeBox" class="confirmed-notice-box" style="display: none;">
-          <span style="font-size: 22px;">✅</span>
-          <div>
-            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase;">ALL STRATEGIES CONFIRMED — TRADE READY</div>
-            <div style="font-size: 11px; opacity: 0.9;">৮টি কনফার্মেশন পিলার, ট্রেন্ড অ্যালাইনমেন্ট ও সেশন সুইপ সফলভাবে যাচাই করা হয়েছে।</div>
-          </div>
+          <span style="font-size: 11px; color: var(--accent-gold);">Risk-Managed</span>
         </div>
 
         <div id="tradeSetupBox" class="trade-box">
@@ -280,69 +207,8 @@
 
     </div>
 
-    <!-- CENTER COLUMN: RADAR & INTERACTIVE CHART -->
+    <!-- CENTER COLUMN: INTERACTIVE CHART -->
     <div style="display: flex; flex-direction: column; gap: 16px;">
-
-      <!-- PREDICTIVE MARKET FALL & RISE RADAR CARD -->
-      <div id="fallRiseRadarCard" class="card" style="padding: 16px; border: 2px solid rgba(239, 68, 68, 0.4); background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(15, 23, 42, 0.9));">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span id="fallRisePulseIcon" style="font-size: 26px; line-height: 1;">🔻</span>
-            <div>
-              <div id="fallRiseTitle" style="font-size: 15px; font-weight: 800; color: var(--bear-red); text-transform: uppercase; letter-spacing: 0.5px;">
-                ⚠️ MARKET FALL WARNING (DUMP DETECTED)
-              </div>
-              <div id="fallRiseSubtitle" style="font-size: 12px; color: var(--text-secondary);">
-                মার্কেট দ্রুত নিচে পড়বে (Sell / Short সিগন্যাল অ্যাক্টিভ)
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span id="fallRiseAccuracyBadge" style="font-size: 12px; font-family: var(--font-mono); font-weight: 700; background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.4);">
-              Fall Probability: 86%
-            </span>
-            <button id="radarVoiceBtn" class="btn-secondary" style="font-size: 11px; padding: 4px 8px;">🔊 Voice Alert</button>
-          </div>
-        </div>
-
-        <!-- DIRECT ACTION CALLOUT BOX -->
-        <div id="fallRiseActionBox" style="background: rgba(0, 0, 0, 0.45); border-radius: 8px; padding: 12px 16px; border: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: var(--accent-gold); font-family: var(--font-mono); font-weight: 700;">
-              🎯 DIRECT ENTRY INSTRUCTION (সরাসরি এন্ট্রি নির্দেশ):
-            </div>
-            <div id="fallRiseDirectEntry" style="font-size: 18px; font-weight: 800; color: var(--bear-red); font-family: var(--font-mono); margin-top: 3px;">
-              🔴 এখনই SELL / SHORT এন্ট্রি নিন: $67,420
-            </div>
-            <div id="fallRiseTargetsText" style="font-size: 12px; font-family: var(--font-mono); color: #cbd5e1; margin-top: 4px;">
-              Stop Loss: $68,150 • TP1: $66,500 • TP2: $65,600
-            </div>
-          </div>
-
-          <!-- Probability Gauge Bar -->
-          <div style="min-width: 190px;">
-            <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); margin-bottom: 4px;">
-              <span style="color: var(--bear-red);">FALL: <b id="barFallPct">86%</b></span>
-              <span style="color: var(--bull-green);">RISE: <b id="barRisePct">14%</b></span>
-            </div>
-            <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: flex;">
-              <div id="barFallFill" style="width: 86%; background: var(--bear-red); transition: width 0.3s;"></div>
-              <div id="barRiseFill" style="width: 14%; background: var(--bull-green); transition: width 0.3s;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- WHY IT WILL FALL / RISE (TECHNICAL CATALYSTS) -->
-        <div style="margin-top: 10px;">
-          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">
-            🔍 কেন মার্কেট পড়বে বা উঠবে? (Live Technical Triggers):
-          </div>
-          <ul id="fallRiseCatalystsList" style="margin: 0; padding-left: 18px; font-size: 11px; color: var(--text-primary); line-height: 1.6; font-family: var(--font-mono);">
-            <!-- Populated dynamically -->
-          </ul>
-        </div>
-      </div>
-
       <div class="card" style="padding: 12px; height: 100%;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div class="card-title" style="margin: 0;">

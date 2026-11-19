@@ -7,19 +7,7 @@ let autoRefreshSec = 15;
 let countdown = autoRefreshSec;
 let chartInstance = null;
 let lastKnownSignal = null;
-let lastKnownDirection = null;
 let audioEnabled = true;
-
-// Speech synthesis alert
-function speakAlert(text) {
-  if (!audioEnabled || !('speechSynthesis' in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    window.speechSynthesis.speak(utterance);
-  } catch (e) {}
-}
 
 // Web Audio API Chime for trade signal alert
 function playAlertChime(isBullish = true) {
@@ -80,7 +68,7 @@ async function loadData() {
 
 // Update UI
 function updateAnalysisUI(data, history) {
-  const { confluence, tradeSetup, currentPrice, ticker, orderbook, indicators, smc, session, fallRisePredictor } = data;
+  const { confluence, tradeSetup, currentPrice, ticker, orderbook, indicators, smc } = data;
 
   // 1. Ticker Bar
   document.getElementById('currentPriceDisplay').innerText = '$' + formatPrice(currentPrice);
@@ -96,150 +84,7 @@ function updateAnalysisUI(data, history) {
     document.getElementById('markPriceDisplay').innerText = '$' + formatPrice(ticker.markPrice);
   }
 
-  // 2. Institutional Trading Sessions & Killzones Bar
-  if (session) {
-    const sessionNameEl = document.getElementById('activeSessionName');
-    if (sessionNameEl) sessionNameEl.innerText = session.activeSession || 'STANDARD SESSION';
-
-    const utcEl = document.getElementById('utcClockDisplay');
-    const istEl = document.getElementById('istClockDisplay');
-    if (utcEl) utcEl.innerText = session.clocks?.utc ? `UTC: ${session.clocks.utc}` : 'UTC: --:--';
-    if (istEl) istEl.innerText = session.clocks?.ist ? `IST: ${session.clocks.ist}` : 'IST: --:--';
-
-    // Toggle Session Active Pills
-    const pillAsia = document.getElementById('pillAsia');
-    const pillLondon = document.getElementById('pillLondon');
-    const pillOverlap = document.getElementById('pillOverlap');
-    const pillNY = document.getElementById('pillNY');
-
-    if (pillAsia) pillAsia.className = `session-pill ${session.isAsiaActive ? 'active' : ''}`;
-    if (pillLondon) pillLondon.className = `session-pill ${session.isLondonActive ? 'active' : ''}`;
-    if (pillOverlap) pillOverlap.className = `session-pill overlap ${session.isOverlapActive ? 'active' : ''}`;
-    if (pillNY) pillNY.className = `session-pill ${session.isNyActive ? 'active' : ''}`;
-
-    // Asia High / Low Range Display
-    const asiaHighEl = document.getElementById('asiaHighDisplay');
-    const asiaLowEl = document.getElementById('asiaLowDisplay');
-    if (asiaHighEl) asiaHighEl.innerText = session.asiaRange?.high ? '$' + formatPrice(session.asiaRange.high) : '--';
-    if (asiaLowEl) asiaLowEl.innerText = session.asiaRange?.low ? '$' + formatPrice(session.asiaRange.low) : '--';
-
-    // Liquidity Sweep Badge
-    const sweepBadge = document.getElementById('sessionSweepBadge');
-    if (sweepBadge) {
-      if (session.liquiditySweep?.hasSweptHigh) {
-        sweepBadge.className = 'sweep-badge swept-high';
-        sweepBadge.innerText = '⚡ Swept Asia High (Supply Liquidity)';
-      } else if (session.liquiditySweep?.hasSweptLow) {
-        sweepBadge.className = 'sweep-badge swept-low';
-        sweepBadge.innerText = '⚡ Swept Asia Low (Demand Liquidity)';
-      } else {
-        sweepBadge.className = 'sweep-badge';
-        sweepBadge.innerText = 'Asia Range Intact';
-      }
-    }
-  }
-
-  // 3. Predictive Market Fall & Rise Radar Indicator
-  if (fallRisePredictor) {
-    const radarCard = document.getElementById('fallRiseRadarCard');
-    const titleEl = document.getElementById('fallRiseTitle');
-    const subEl = document.getElementById('fallRiseSubtitle');
-    const iconEl = document.getElementById('fallRisePulseIcon');
-    const badgeEl = document.getElementById('fallRiseAccuracyBadge');
-    const directEntryEl = document.getElementById('fallRiseDirectEntry');
-    const targetsEl = document.getElementById('fallRiseTargetsText');
-    const barFallPct = document.getElementById('barFallPct');
-    const barRisePct = document.getElementById('barRisePct');
-    const barFallFill = document.getElementById('barFallFill');
-    const barRiseFill = document.getElementById('barRiseFill');
-    const catalystsList = document.getElementById('fallRiseCatalystsList');
-
-    if (titleEl) titleEl.innerText = fallRisePredictor.title;
-    if (subEl) subEl.innerText = fallRisePredictor.movementBengali;
-
-    if (fallRisePredictor.direction === 'FALL') {
-      if (radarCard) {
-        radarCard.style.border = '2px solid rgba(239, 68, 68, 0.5)';
-        radarCard.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(15, 23, 42, 0.95))';
-      }
-      if (titleEl) titleEl.style.color = 'var(--bear-red)';
-      if (iconEl) iconEl.innerText = '🔻';
-      if (badgeEl) {
-        badgeEl.innerText = `Fall Probability: ${fallRisePredictor.fallProbability}%`;
-        badgeEl.style.color = '#fca5a5';
-        badgeEl.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-        badgeEl.style.background = 'rgba(239, 68, 68, 0.2)';
-      }
-      if (directEntryEl) {
-        directEntryEl.innerText = fallRisePredictor.actionCommand;
-        directEntryEl.style.color = 'var(--bear-red)';
-      }
-    } else if (fallRisePredictor.direction === 'RISE') {
-      if (radarCard) {
-        radarCard.style.border = '2px solid rgba(0, 192, 118, 0.5)';
-        radarCard.style.background = 'linear-gradient(135deg, rgba(0, 192, 118, 0.14), rgba(15, 23, 42, 0.95))';
-      }
-      if (titleEl) titleEl.style.color = 'var(--bull-green)';
-      if (iconEl) iconEl.innerText = '🚀';
-      if (badgeEl) {
-        badgeEl.innerText = `Rise Probability: ${fallRisePredictor.riseProbability}%`;
-        badgeEl.style.color = '#86efac';
-        badgeEl.style.borderColor = 'rgba(0, 192, 118, 0.4)';
-        badgeEl.style.background = 'rgba(0, 192, 118, 0.2)';
-      }
-      if (directEntryEl) {
-        directEntryEl.innerText = fallRisePredictor.actionCommand;
-        directEntryEl.style.color = 'var(--bull-green)';
-      }
-    } else {
-      if (radarCard) {
-        radarCard.style.border = '1px solid var(--border-color)';
-        radarCard.style.background = 'var(--bg-card)';
-      }
-      if (titleEl) {
-        titleEl.innerText = '⚖️ ACCUMULATION RANGE: WATCHING BREAKOUT ⏳';
-        titleEl.style.color = 'var(--accent-gold)';
-      }
-      if (iconEl) iconEl.innerText = '⚖️';
-      if (badgeEl) {
-        badgeEl.innerText = 'Consolidation: 50%';
-        badgeEl.style.color = 'var(--accent-gold)';
-        badgeEl.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-        badgeEl.style.background = 'rgba(245, 158, 11, 0.2)';
-      }
-      if (directEntryEl) {
-        directEntryEl.innerText = fallRisePredictor.actionCommand;
-        directEntryEl.style.color = 'var(--accent-gold)';
-      }
-    }
-
-    if (targetsEl) {
-      targetsEl.innerText = `Stop Loss: $${formatPrice(fallRisePredictor.stopLoss)} • TP1: $${formatPrice(fallRisePredictor.tp1)} • TP2: $${formatPrice(fallRisePredictor.tp2)} • TP3: $${formatPrice(fallRisePredictor.tp3)}`;
-    }
-
-    if (barFallPct) barFallPct.innerText = `${fallRisePredictor.fallProbability}%`;
-    if (barRisePct) barRisePct.innerText = `${fallRisePredictor.riseProbability}%`;
-    if (barFallFill) barFallFill.style.width = `${fallRisePredictor.fallProbability}%`;
-    if (barRiseFill) barRiseFill.style.width = `${fallRisePredictor.riseProbability}%`;
-
-    if (catalystsList && fallRisePredictor.catalysts) {
-      catalystsList.innerHTML = fallRisePredictor.catalysts.map(c => `<li>${c}</li>`).join('');
-    }
-
-    // Voice alert on direction change
-    if (lastKnownDirection !== fallRisePredictor.direction) {
-      if (fallRisePredictor.direction === 'FALL') {
-        playAlertChime(false);
-        speakAlert('Market Fall Warning. Take Short entry.');
-      } else if (fallRisePredictor.direction === 'RISE') {
-        playAlertChime(true);
-        speakAlert('Market Rise Warning. Take Long entry.');
-      }
-      lastKnownDirection = fallRisePredictor.direction;
-    }
-  }
-
-  // 4. Big Signal Banner
+  // 2. Big Signal Banner
   const banner = document.getElementById('signalBanner');
   banner.className = `signal-banner ${confluence.signalClass}`;
   document.getElementById('signalBadge').innerText = confluence.signal;
@@ -249,12 +94,12 @@ function updateAnalysisUI(data, history) {
   document.getElementById('probabilityDisplay').innerText = `Estimated Accuracy: ~${confluence.estimatedProbability}%`;
 
   // Sound alert on new high-confidence signal
-  if (confluence.signal !== lastKnownSignal && confluence.isFullConfirmation) {
+  if (confluence.signal !== lastKnownSignal && confluence.signal.includes('STRONG')) {
     playAlertChime(confluence.biasDirection === 'LONG');
     lastKnownSignal = confluence.signal;
   }
 
-  // 5. Confluence Score Meter
+  // 3. Confluence Score Meter
   const bullFill = document.getElementById('meterBullFill');
   const bearFill = document.getElementById('meterBearFill');
   if (confluence.score >= 0) {
@@ -265,17 +110,12 @@ function updateAnalysisUI(data, history) {
     bullFill.style.width = '0%';
   }
 
-  // 6. Actionable Trade Setup Box
-  const unconfirmedBox = document.getElementById('unconfirmedNoticeBox');
-  const confirmedBox = document.getElementById('confirmedNoticeBox');
-  const gateBadge = document.getElementById('tradeSetupGateBadge');
-  const missingList = document.getElementById('missingConfirmationsList');
+  // 4. Trade Setup Box
   const tradeBox = document.getElementById('tradeSetupBox');
-
   if (tradeSetup && tradeSetup.entryPrice) {
     tradeBox.style.display = 'block';
     document.getElementById('tradeDirection').innerText = tradeSetup.direction;
-    document.getElementById('tradeDirection').className = `trade-row-val ${tradeSetup.direction.includes('BUY') || tradeSetup.direction.includes('LONG') ? 'green' : 'red'}`;
+    document.getElementById('tradeDirection').className = `trade-row-val ${confluence.biasDirection === 'LONG' ? 'green' : 'red'}`;
     document.getElementById('tradeEntry').innerText = '$' + formatPrice(tradeSetup.entryPrice);
     document.getElementById('tradeSL').innerText = '$' + formatPrice(tradeSetup.stopLoss) + ` (${tradeSetup.riskPercentage}% risk)`;
     document.getElementById('tradeTP1').innerText = '$' + formatPrice(tradeSetup.tp1);
@@ -286,34 +126,17 @@ function updateAnalysisUI(data, history) {
 
     // Trigger position calculator refresh
     recalcPositionSize(tradeSetup);
-
-    if (tradeSetup.isConfirmed) {
-      if (unconfirmedBox) unconfirmedBox.style.display = 'none';
-      if (confirmedBox) confirmedBox.style.display = 'flex';
-      if (gateBadge) {
-        gateBadge.innerText = 'GATE: ALL CONFIRMED ✅';
-        gateBadge.style.background = 'rgba(0, 192, 118, 0.2)';
-        gateBadge.style.color = 'var(--bull-green)';
-      }
-    } else {
-      if (confirmedBox) confirmedBox.style.display = 'none';
-      if (unconfirmedBox) {
-        unconfirmedBox.style.display = 'block';
-        if (missingList) {
-          const reasons = tradeSetup.missingConfirmations || confluence.missingConfirmations || [];
-          if (reasons.length > 0) {
-            missingList.innerHTML = reasons.map(r => `<li>${r}</li>`).join('');
-          } else {
-            missingList.innerHTML = '<li>⏳ Confluence indicators are currently in early momentum formation.</li>';
-          }
-        }
-      }
-      if (gateBadge) {
-        gateBadge.innerText = 'GATE: MOMENTUM ENTRY ⚡';
-        gateBadge.style.background = 'rgba(245, 158, 11, 0.2)';
-        gateBadge.style.color = 'var(--accent-gold)';
-      }
-    }
+  } else {
+    tradeBox.style.display = 'block';
+    document.getElementById('tradeDirection').innerText = 'WAIT / CHOPPY';
+    document.getElementById('tradeDirection').className = 'trade-row-val';
+    document.getElementById('tradeEntry').innerText = 'No Entry (Sideways)';
+    document.getElementById('tradeSL').innerText = '--';
+    document.getElementById('tradeTP1').innerText = '--';
+    document.getElementById('tradeTP2').innerText = '--';
+    document.getElementById('tradeTP3').innerText = '--';
+    document.getElementById('tradeRR').innerText = 'N/A';
+    document.getElementById('invalidationText').innerText = tradeSetup.invalidation;
   }
 
   // 5. Render Valid Institutional S/R Zones
@@ -534,16 +357,6 @@ function initApp() {
       audioEnabled = !audioEnabled;
       audioBtn.innerText = audioEnabled ? '🔊 Sound On' : '🔇 Muted';
       audioBtn.style.color = audioEnabled ? 'var(--bull-green)' : 'var(--text-muted)';
-    });
-  }
-
-  // Voice button on Fall/Rise Radar
-  const voiceBtn = document.getElementById('radarVoiceBtn');
-  if (voiceBtn) {
-    voiceBtn.addEventListener('click', () => {
-      const entryText = document.getElementById('fallRiseDirectEntry')?.innerText || '';
-      const subText = document.getElementById('fallRiseSubtitle')?.innerText || '';
-      speakAlert(`${entryText}. ${subText}`);
     });
   }
 
